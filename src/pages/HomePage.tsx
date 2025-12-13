@@ -144,7 +144,7 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%)',
-    gap: '1200px',
+    gap: '20px',
     padding: '1rem 3rem',
   },
   logo: {
