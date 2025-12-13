@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
+import { Book } from 'lucide-react'
 import { 
   Settings, 
   LogOut, 
@@ -72,6 +73,27 @@ interface User {
   created_at: string
 }
 
+// Fichier : AdminPage.tsx (Avant 'export default function AdminPage()')
+
+// Mappage des noms d'icônes aux composants Lucide
+const IconMap: { [key: string]: LucideIcon } = {
+  Book: Book,
+
+  // Ajoutez ici toutes les icônes Lucide que vos admins peuvent choisir
+}
+
+// Fonction qui prend le nom (string) et retourne le composant Icône (JSX)
+const getLucideIcon = (iconName: string, size = 20, color = 'white') => {
+  // Récupère le composant Icône depuis le mappage
+  const IconComponent = IconMap[iconName]
+
+  if (IconComponent) {
+    return <IconComponent size={size} color={color} />
+  }
+  // Retourne une icône par défaut si le nom n'est pas trouvé
+  return <Book size={size} color={color} /> 
+}
+
 export default function AdminPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'categories' | 'books' | 'payments'>('payments')
@@ -87,8 +109,8 @@ export default function AdminPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [editingBook, setEditingBook] = useState<Book | null>(null)
 
-  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', color: '#667eea', icon: '📚' })
-  const [bookForm, setBookForm] = useState({
+const [categoryForm, setCategoryForm] = useState({ name: '', description: '', color: '#667eea', icon: 'Book' })  ;
+const [bookForm, setBookForm] = useState({
     title: '',
     author: '',
     description: '',

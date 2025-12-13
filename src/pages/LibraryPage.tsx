@@ -202,16 +202,10 @@ export default function LibraryPage() {
           <BookOpen size={28} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
           DigiLib
         </h1>
-        <div style={styles.headerActions}>
-          <span style={styles.userName}>
-            <User size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-            Bienvenue, {userName}
-          </span>
-          <button onClick={handleLogout} style={styles.logoutButton}>
-            <LogOut size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-            Quitter
-          </button>
-        </div>
+        <button onClick={handleLogout} style={styles.logoutButton}>
+          <LogOut size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
+          Quitter
+        </button>
       </header>
 
       <div style={styles.content}>
@@ -219,6 +213,10 @@ export default function LibraryPage() {
           // VUE CATÉGORIES
           <>
             <div style={styles.welcomeSection}>
+              <div style={styles.userGreeting}>
+                <User size={32} style={{ marginBottom: '0.5rem' }} />
+                <h2 style={styles.greetingText}>Bienvenue, {userName}</h2>
+              </div>
               <h2 style={styles.welcomeTitle}>Explorez notre bibliothèque</h2>
               <p style={styles.welcomeSubtitle}>Choisissez une catégorie pour découvrir nos livres</p>
             </div>
@@ -338,56 +336,79 @@ const styles = {
   container: { minHeight: '100vh', background: '#f5f5f5' },
   header: {
     background: 'white',
-    padding: '1.5rem 2rem',
+    padding: '1rem 1.5rem',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    position: 'sticky' as const,
+    top: 0,
+    zIndex: 100,
   },
   logo: { 
     margin: 0, 
     color: '#667eea', 
-    fontSize: '1.5rem', 
+    fontSize: 'clamp(1.2rem, 4vw, 1.5rem)',
     display: 'flex', 
     alignItems: 'center',
     fontWeight: 'bold',
   },
-  headerActions: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '1.5rem' 
-  },
-  userName: { 
-    color: '#333', 
-    fontWeight: '600', 
-    fontSize: '1rem',
-    display: 'flex',
-    alignItems: 'center',
-  },
   logoutButton: {
     background: '#ef4444',
     color: 'white',
-    padding: '0.5rem 1.5rem',
+    padding: '0.5rem 1rem',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
     fontWeight: '600',
-    fontSize: '0.9rem',
+    fontSize: 'clamp(0.8rem, 2vw, 0.9rem)',
     display: 'flex',
     alignItems: 'center',
+    gap: '0.3rem',
     transition: 'all 0.3s',
   },
-  content: { maxWidth: '1400px', margin: '0 auto', padding: '2rem' },
-  welcomeSection: { textAlign: 'center' as const, marginBottom: '3rem' },
-  welcomeTitle: { fontSize: '2.5rem', color: '#333', marginBottom: '0.5rem' },
-  welcomeSubtitle: { fontSize: '1.1rem', color: '#666' },
+  content: { 
+    maxWidth: '1400px', 
+    margin: '0 auto', 
+    padding: 'clamp(1rem, 3vw, 2rem)',
+  },
+  welcomeSection: { 
+    textAlign: 'center' as const, 
+    marginBottom: 'clamp(2rem, 5vw, 3rem)',
+  },
+  userGreeting: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    marginBottom: '1.5rem',
+    padding: '1.5rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    borderRadius: '20px',
+    color: 'white',
+    boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)',
+  },
+  greetingText: {
+    fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+    fontWeight: '700',
+    margin: 0,
+  },
+  welcomeTitle: { 
+    fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', 
+    color: '#333', 
+    marginBottom: '0.5rem',
+    fontWeight: '700',
+  },
+  welcomeSubtitle: { 
+    fontSize: 'clamp(1rem, 3vw, 1.1rem)', 
+    color: '#666',
+  },
   categoriesGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: '2rem',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))',
+    gap: 'clamp(1rem, 3vw, 2rem)',
   },
   categoryCard: {
-    padding: '2.5rem 2rem',
+    padding: 'clamp(1.5rem, 4vw, 2.5rem) clamp(1rem, 3vw, 2rem)',
     borderRadius: '20px',
     color: 'white',
     cursor: 'pointer',
@@ -396,16 +417,16 @@ const styles = {
     position: 'relative' as const,
   },
   categoryIcon: {
-    fontSize: '3.5rem',
+    fontSize: 'clamp(2.5rem, 7vw, 3.5rem)',
     marginBottom: '1rem',
   },
   categoryName: {
-    fontSize: '1.5rem',
+    fontSize: 'clamp(1.2rem, 4vw, 1.5rem)',
     fontWeight: '700',
     marginBottom: '0.5rem',
   },
   categoryDesc: {
-    fontSize: '0.95rem',
+    fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)',
     opacity: 0.9,
     margin: 0,
   },
@@ -424,14 +445,19 @@ const styles = {
     border: 'none',
     borderRadius: '10px',
     cursor: 'pointer',
-    fontSize: '1rem',
+    fontSize: 'clamp(0.9rem, 2.5vw, 1rem)',
     fontWeight: '600',
     marginBottom: '1rem',
-    display: 'flex',
+    display: 'inline-flex',
     alignItems: 'center',
+    gap: '0.5rem',
     transition: 'all 0.3s',
   },
-  categoryTitle: { fontSize: '2rem', color: '#333', margin: '1rem 0' },
+  categoryTitle: { 
+    fontSize: 'clamp(1.5rem, 5vw, 2rem)', 
+    color: '#333', 
+    margin: '1rem 0',
+  },
   searchBar: { 
     marginBottom: '2rem',
     position: 'relative' as const,
@@ -439,7 +465,7 @@ const styles = {
   searchInput: {
     width: '100%',
     padding: '1rem 1rem 1rem 3rem',
-    fontSize: '1rem',
+    fontSize: 'clamp(0.9rem, 2.5vw, 1rem)',
     border: '2px solid #e0e0e0',
     borderRadius: '12px',
     outline: 'none',
@@ -447,8 +473,8 @@ const styles = {
   },
   booksGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: '2rem',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(min(250px, 100%), 1fr))',
+    gap: 'clamp(1rem, 3vw, 2rem)',
   },
   bookCard: {
     background: 'white',
@@ -458,14 +484,38 @@ const styles = {
     transition: 'transform 0.3s, box-shadow 0.3s',
     cursor: 'pointer',
   },
-  bookCover: { width: '100%', height: '350px', objectFit: 'cover' as const },
-  bookInfo: { padding: '1.5rem' },
-  bookTitle: { margin: '0 0 0.5rem 0', color: '#333', fontSize: '1.2rem', fontWeight: '700' },
-  bookAuthor: { margin: '0 0 0.75rem 0', color: '#667eea', fontSize: '0.9rem', fontWeight: '600' },
-  bookDescription: { color: '#666', fontSize: '0.9rem', marginBottom: '1rem', lineHeight: 1.5 },
-  bookActions: { display: 'flex', gap: '0.5rem' },
+  bookCover: { 
+    width: '100%', 
+    height: 'clamp(300px, 40vw, 350px)', 
+    objectFit: 'cover' as const,
+  },
+  bookInfo: { padding: 'clamp(1rem, 3vw, 1.5rem)' },
+  bookTitle: { 
+    margin: '0 0 0.5rem 0', 
+    color: '#333', 
+    fontSize: 'clamp(1rem, 3vw, 1.2rem)', 
+    fontWeight: '700',
+  },
+  bookAuthor: { 
+    margin: '0 0 0.75rem 0', 
+    color: '#667eea', 
+    fontSize: 'clamp(0.85rem, 2.5vw, 0.9rem)', 
+    fontWeight: '600',
+  },
+  bookDescription: { 
+    color: '#666', 
+    fontSize: 'clamp(0.85rem, 2.5vw, 0.9rem)', 
+    marginBottom: '1rem', 
+    lineHeight: 1.5,
+  },
+  bookActions: { 
+    display: 'flex', 
+    gap: '0.5rem',
+    flexWrap: 'wrap' as const,
+  },
   detailsButton: {
     flex: 1,
+    minWidth: '120px',
     background: '#667eea',
     color: 'white',
     padding: '0.75rem',
@@ -473,9 +523,11 @@ const styles = {
     borderRadius: '8px',
     cursor: 'pointer',
     fontWeight: '600',
+    fontSize: 'clamp(0.8rem, 2vw, 0.9rem)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: '0.3rem',
     transition: 'all 0.3s',
   },
   downloadButtonSmall: {
@@ -486,16 +538,19 @@ const styles = {
     borderRadius: '8px',
     cursor: 'pointer',
     fontWeight: '600',
-    fontSize: '0.85rem',
+    fontSize: 'clamp(0.75rem, 2vw, 0.85rem)',
     display: 'flex',
     alignItems: 'center',
+    gap: '0.3rem',
     transition: 'all 0.3s',
+    whiteSpace: 'nowrap' as const,
   },
   emptyMessage: {
     textAlign: 'center' as const,
-    fontSize: '1.2rem',
+    fontSize: 'clamp(1rem, 3vw, 1.2rem)',
     color: '#666',
     marginTop: '3rem',
+    padding: '2rem',
   },
   loading: {
     minHeight: '100vh',
@@ -504,17 +559,23 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '2rem',
   },
   spinner: {
-    width: '60px',
-    height: '60px',
+    width: 'clamp(40px, 10vw, 60px)',
+    height: 'clamp(40px, 10vw, 60px)',
     border: '6px solid rgba(255,255,255,0.3)',
     borderTop: '6px solid white',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
     marginBottom: '1.5rem',
   },
-  loadingText: { fontSize: '1.25rem', fontWeight: '600', color: 'white' },
+  loadingText: { 
+    fontSize: 'clamp(1rem, 3vw, 1.25rem)', 
+    fontWeight: '600', 
+    color: 'white',
+    textAlign: 'center' as const,
+  },
 }
 
 const styleSheet = document.createElement('style')
