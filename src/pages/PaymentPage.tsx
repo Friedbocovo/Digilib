@@ -8,28 +8,33 @@ import {
   Phone, 
   CreditCard, 
   Check, 
-  Loader 
+  Loader,
+  User
 } from 'lucide-react'
 import Video from './vid_ebook2.mp4'
 
-// ⚠️ MODE SIMULATION - Changez false en true pour activer FedaPay réel
-const SIMULATION_MODE = true
+// ⚠️ MODE SIMULATION 
+const SIMULATION_MODE = false
 
-const FEDAPAY_PUBLIC_KEY = import.meta.env.VITE_FEDAPAY_PUBLIC_KEY || ''
-const LIBRARY_ACCESS_PRICE = 3000
+const MAKETOU_API_KEY = import.meta.env.VITE_MAKETOU_API_KEY || ''
+const MAKETOU_PRODUCT_ID = import.meta.env.VITE_MAKETOU_PRODUCT_ID || ''
+const LIBRARY_ACCESS_PRICE = 5000
 
 export default function PaymentPage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
+  const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
   const [userPhone, setUserPhone] = useState('')
-  const [step, setStep] = useState<'email' | 'payment'>('email')
+  const [step, setStep] = useState<'info' | 'payment'>('info')
   const [popup, setPopup] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
 
   useEffect(() => {
-    const tempEmail = localStorage.getItem('temp_email')
-    const tempPhone = localStorage.getItem('temp_phone')
+    const tempName = localStorage.getItem('user_name')
+    const tempEmail = localStorage.getItem('user_email')
+    const tempPhone = localStorage.getItem('user_phone')
     
+    if (tempName) setUserName(tempName)
     if (tempEmail) setUserEmail(tempEmail)
     if (tempPhone) setUserPhone(tempPhone)
     
@@ -38,28 +43,42 @@ export default function PaymentPage() {
     }
   }, [])
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleInfoSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    const phoneRegex = /^(229)?[0-9]{8}$/
-    if (!phoneRegex.test(userPhone.replace(/\s/g, ''))) {
+    if (!userName.trim()) {
+      setPopup({ message: 'Veuillez entrer votre nom', type: 'error' })
+      return
+    }
+
+    if (!userEmail.includes('@')) {
+      setPopup({ message: 'Veuillez entrer un email valide', type: 'error' })
+      return
+    }
+
+    // Validation du téléphone plus stricte
+    const cleanPhone = userPhone.replace(/\s/g, '').replace(/^\+/, '')
+    
+    // Bénin : 229XXXXXXXX (12 chiffres) ou XXXXXXXX (8 chiffres)
+    const isBeninPhone = /^(229)?[0-9]{8,10}$/.test(cleanPhone)
+    
+    // International : +XXXXXXXXXXX (10-15 chiffres)
+    const isInternationalPhone = /^[0-9]{10,15}$/.test(cleanPhone)
+    
+    if (!isBeninPhone && !isInternationalPhone) {
       setPopup({ 
-        message: 'Numéro invalide. Format: 229XXXXXXXX ou 90123456', 
+        message: 'Numéro invalide. Format Bénin: 229XXXXXXXX (ex: 22990123456) ou international complet', 
         type: 'error' 
       })
       return
     }
 
-    if (userEmail && userEmail.includes('@')) {
-      setStep('payment')
-    } else {
-      setPopup({ message: 'Veuillez entrer un email valide', type: 'error' })
-    }
+    setStep('payment')
   }
 
-  const handlePayment = async () => {
-    if (!userEmail || !userPhone) {
-      setPopup({ message: 'Veuillez entrer un email et un numéro de téléphone', type: 'error' })
+  const handleMaketouPayment = async () => {
+    if (!userEmail || !userPhone || !userName) {
+      setPopup({ message: 'Veuillez remplir tous les champs', type: 'error' })
       return
     }
 
@@ -70,71 +89,136 @@ export default function PaymentPage() {
       setPopup({ message: 'Simulation de paiement en cours...', type: 'info' })
       
       setTimeout(async () => {
-        await handlePaymentSuccess({
-          transaction_id: `SIM-${Date.now()}`,
-          status: 'successful'
-        }, `SIM-${Date.now()}`)
+        await handlePaymentSuccess(`SIM-${Date.now()}`)
       }, 2000)
       
     } else {
-      if (!FEDAPAY_PUBLIC_KEY) {
-        setPopup({ message: 'Clé API FedaPay manquante', type: 'error' })
-        setLoading(false)
-        return
-      }
-
+      // MODE PRODUCTION : Maketou
       try {
+        if (!MAKETOU_API_KEY || !MAKETOU_PRODUCT_ID) {
+          setPopup({ message: 'Configuration Maketou manquante', type: 'error' })
+          setLoading(false)
+          return
+        }
+
         const cleanEmail = userEmail.trim().toLowerCase()
         const cleanPhone = userPhone.trim().replace(/\s/g, '')
-        const phoneNumber = cleanPhone.startsWith('229') ? cleanPhone : `229${cleanPhone}`
+        const cleanName = userName.trim()
+
+        // Diviser le nom en prénom et nom
+        const nameParts = cleanName.split(' ')
+        const firstName = nameParts[0]
+        const lastName = nameParts.slice(1).join(' ') || firstName
+
+        console.log('📦 Création du panier Maketou...')
+        console.log('🔑 API Key présente:', !!MAKETOU_API_KEY)
+        console.log('📦 Product ID:', MAKETOU_PRODUCT_ID)
+
+        // Déterminer l'URL de redirection
+        // En production (Vercel), utiliser le vrai domaine
+        // En développement (localhost), ne pas mettre de redirectURL car Maketou le refuse
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         
-        const response = await fetch('https://api.fedapay.com/v1/transactions', {
+        const payload: any = {
+          productDocumentId: MAKETOU_PRODUCT_ID,
+          email: cleanEmail,
+          firstName: firstName,
+          lastName: lastName,
+          phone: cleanPhone.startsWith('+') ? cleanPhone : `+${cleanPhone}`,
+          meta: {
+            source: 'digilib-website',
+            userName: cleanName
+          }
+        }
+
+        // Ajouter redirectURL seulement en production
+        if (!isLocalhost) {
+          payload.redirectURL = `${window.location.origin}/library`
+        }
+
+        console.log('📤 Payload envoyé:', JSON.stringify(payload, null, 2))
+
+        // Créer le panier Maketou
+        const response = await fetch('https://api.maketou.net/api/v1/stores/cart/checkout', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${FEDAPAY_PUBLIC_KEY}`
+            'Authorization': `Bearer ${MAKETOU_API_KEY}`
           },
-          body: JSON.stringify({
-            description: 'Accès bibliothèque Free Books',
-            amount: LIBRARY_ACCESS_PRICE,
-            currency: { iso: 'XOF' },
-            customer: {
-              firstname: cleanEmail.split('@')[0],
-              lastname: 'User',
-              email: cleanEmail,
-              phone_number: { number: phoneNumber, country: 'bj' }
-            }
-          })
+          body: JSON.stringify(payload)
         })
 
         const data = await response.json()
+        console.log('📥 Réponse Maketou:', data)
+        console.log('📥 Message d\'erreur brut:', data.message)
+        
+        // Si c'est un array, afficher chaque élément
+        if (Array.isArray(data.message)) {
+          data.message.forEach((msg, index) => {
+            console.log(`📥 Message ${index}:`, JSON.stringify(msg, null, 2))
+          })
+        }
 
-        if (data.v1?.token) {
-          const paymentUrl = `https://checkout.fedapay.com/${data.v1.token}`
-          window.open(paymentUrl, '_blank')
-          setPopup({ message: 'Complétez le paiement dans le nouvel onglet', type: 'info' })
+        if (response.ok && data.redirectUrl) {
+          console.log('✅ Panier créé:', data.cart.id)
+          
+          // Sauvegarder l'ID du panier pour vérification ultérieure
+          localStorage.setItem('maketou_cart_id', data.cart.id)
+          localStorage.setItem('user_name', cleanName)
+          localStorage.setItem('user_email', cleanEmail)
+          localStorage.setItem('user_phone', cleanPhone)
+
+          // Rediriger vers la page de paiement Maketou
+          window.location.href = data.redirectUrl
         } else {
-          throw new Error('Token non reçu')
+          // Gérer les messages d'erreur (peut être un array ou un string)
+          let errorMessage = 'Erreur lors de la création du panier'
+          
+          if (data.message) {
+            if (Array.isArray(data.message)) {
+              // Si c'est un array d'objets, extraire les messages
+              const messages = data.message.map(msg => {
+                if (typeof msg === 'string') return msg
+                if (msg.message) return msg.message
+                if (msg.error) return msg.error
+                return JSON.stringify(msg)
+              })
+              errorMessage = messages.join(', ')
+            } else if (typeof data.message === 'string') {
+              errorMessage = data.message
+            } else if (typeof data.message === 'object') {
+              errorMessage = data.message.message || JSON.stringify(data.message)
+            }
+          }
+          
+          console.error('❌ Erreur Maketou complète:', data)
+          console.error('❌ Message formaté:', errorMessage)
+          
+          setPopup({ message: errorMessage, type: 'error' })
+          throw new Error(errorMessage)
         }
         
-        setLoading(false)
-      } catch (error) {
-        console.error('❌ Erreur FedaPay:', error)
-        setPopup({ message: 'Erreur de paiement. Vérifiez votre clé API.', type: 'error' })
+      } catch (error: any) {
+        console.error('❌ Erreur Maketou:', error)
+        setPopup({ 
+          message: error.message || 'Erreur de paiement. Veuillez réessayer.', 
+          type: 'error' 
+        })
         setLoading(false)
       }
     }
   }
 
-  const handlePaymentSuccess = async (transaction: any, transactionId: string) => {
+  const handlePaymentSuccess = async (transactionId: string) => {
     try {
       const accessToken = generateAccessToken()
       const cleanEmail = userEmail.trim().toLowerCase()
       const cleanPhone = userPhone.trim()
-      const userName = cleanEmail.split('@')[0] // Extraire le nom de l'email
+      const cleanName = userName.trim()
 
       console.log('📝 Enregistrement du paiement dans Supabase...')
 
+      // Créer ou récupérer l'utilisateur
       let userId = null
       const { data: existingUser } = await supabase
         .from('users')
@@ -144,11 +228,16 @@ export default function PaymentPage() {
 
       if (existingUser) {
         userId = existingUser.id
+        // Mettre à jour le statut de paiement
+        await supabase
+          .from('users')
+          .update({ has_paid: true })
+          .eq('id', userId)
       } else {
         const { data: newUser } = await supabase
           .from('users')
           .insert({
-            name: userName,
+            name: cleanName,
             email: cleanEmail,
             phone_number: cleanPhone,
             has_paid: true
@@ -159,32 +248,38 @@ export default function PaymentPage() {
         userId = newUser?.id
       }
 
+      // Enregistrer le paiement
       const { data, error } = await supabase.from('payments').insert({
         user_id: userId,
         user_email: cleanEmail,
         phone_number: cleanPhone,
         amount: LIBRARY_ACCESS_PRICE,
         transaction_id: transactionId,
-        payment_method: SIMULATION_MODE ? 'simulation' : 'fedapay',
+        payment_method: SIMULATION_MODE ? 'simulation' : 'maketou',
         status: 'completed',
       }).select()
 
       if (error) {
         console.error('❌ Erreur Supabase:', error)
-        setPopup({ message: `Erreur d'enregistrement: ${error.message}`, type: 'error' })
+        setPopup({ message: 'Erreur d\'enregistrement. Contactez le support.', type: 'error' })
         setLoading(false)
         return
       }
 
       console.log('✅ Paiement enregistré:', data)
 
+      // Sauvegarder dans localStorage
       localStorage.setItem('library_access_token', accessToken)
       localStorage.setItem('user_email', cleanEmail)
-      localStorage.setItem('user_name', userName) // Stocker le nom
-      localStorage.removeItem('temp_email')
-      localStorage.removeItem('temp_phone')
+      localStorage.setItem('user_name', cleanName)
+      localStorage.setItem('user_phone', cleanPhone)
+      localStorage.removeItem('maketou_cart_id')
 
-      setPopup({ message: SIMULATION_MODE ? '🎮 Paiement simulé avec succès !' : 'Paiement réussi !', type: 'success' })
+      setPopup({ 
+        message: SIMULATION_MODE ? '🎮 Paiement simulé avec succès !' : 'Paiement réussi !', 
+        type: 'success' 
+      })
+      
       setTimeout(() => navigate('/library'), 1500)
     } catch (error: any) {
       console.error('❌ Error:', error)
@@ -218,8 +313,23 @@ export default function PaymentPage() {
           </div>
         )}
 
-        {step === 'email' ? (
-          <form onSubmit={handleEmailSubmit} style={styles.form}>
+        {step === 'info' ? (
+          <form onSubmit={handleInfoSubmit} style={styles.form}>
+            <div>
+              <label style={styles.label}>
+                <User size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
+                Votre nom complet :
+              </label>
+              <input
+                type="text"
+                placeholder="Jean Dupont"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                style={styles.input}
+                required
+              />
+            </div>
+
             <div>
               <label style={styles.label}>
                 <Mail size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
@@ -288,7 +398,7 @@ export default function PaymentPage() {
             </div>
 
             <button
-              onClick={handlePayment}
+              onClick={handleMaketouPayment}
               disabled={loading}
               style={{
                 ...styles.payButton,
@@ -309,10 +419,10 @@ export default function PaymentPage() {
             </button>
 
             <p style={styles.secureText}>
-              {SIMULATION_MODE ? '🎮 Paiement simulé - Mode test' : '🔒 Paiement sécurisé par FedaPay'}
+              {SIMULATION_MODE ? '🎮 Paiement simulé - Mode test' : '🔒 Paiement sécurisé par Maketou'}
             </p>
 
-            <button onClick={() => setStep('email')} style={styles.changeEmailButton}>
+            <button onClick={() => setStep('info')} style={styles.changeInfoButton}>
               Changer les informations
             </button>
           </>
@@ -456,7 +566,7 @@ const styles = {
     fontSize: '0.875rem',
     marginBottom: '1rem',
   },
-  changeEmailButton: {
+  changeInfoButton: {
     width: '100%',
     background: 'transparent',
     color: '#667eea',

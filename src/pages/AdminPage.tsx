@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
-import { Book } from 'lucide-react'
+import { Book, LucideIcon } from 'lucide-react'
 import { 
   Settings, 
   LogOut, 
@@ -73,25 +73,42 @@ interface User {
   created_at: string
 }
 
-// Fichier : AdminPage.tsx (Avant 'export default function AdminPage()')
-
-// Mappage des noms d'icônes aux composants Lucide
 const IconMap: { [key: string]: LucideIcon } = {
   Book: Book,
-
-  // Ajoutez ici toutes les icônes Lucide que vos admins peuvent choisir
 }
 
-// Fonction qui prend le nom (string) et retourne le composant Icône (JSX)
 const getLucideIcon = (iconName: string, size = 20, color = 'white') => {
-  // Récupère le composant Icône depuis le mappage
   const IconComponent = IconMap[iconName]
-
   if (IconComponent) {
     return <IconComponent size={size} color={color} />
   }
-  // Retourne une icône par défaut si le nom n'est pas trouvé
   return <Book size={size} color={color} /> 
+}
+
+const getDirectImageUrl = (url: string): string => {
+  if (!url) return 'https://via.placeholder.com/150x200/667eea/ffffff?text=Livre'
+  
+  if (url.includes('drive.google.com/uc?export=view&id=')) {
+    return url
+  }
+  
+  let fileId = ''
+  
+  if (url.includes('/file/d/')) {
+    const match = url.match(/\/file\/d\/([^\/]+)/)
+    if (match) fileId = match[1]
+  } else if (url.includes('id=')) {
+    const match = url.match(/id=([^&]+)/)
+    if (match) fileId = match[1]
+  } else if (url.length > 20 && !url.includes('/')) {
+    fileId = url
+  }
+  
+  if (fileId) {
+    return `https://drive.google.com/uc?export=view&id=${fileId}`
+  }
+  
+  return url || 'https://via.placeholder.com/150x200/667eea/ffffff?text=Livre'
 }
 
 export default function AdminPage() {
@@ -109,8 +126,8 @@ export default function AdminPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [editingBook, setEditingBook] = useState<Book | null>(null)
 
-const [categoryForm, setCategoryForm] = useState({ name: '', description: '', color: '#667eea', icon: 'Book' })  ;
-const [bookForm, setBookForm] = useState({
+  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', color: '#667eea', icon: 'Book' })
+  const [bookForm, setBookForm] = useState({
     title: '',
     author: '',
     description: '',
@@ -256,7 +273,7 @@ const [bookForm, setBookForm] = useState({
 
       setShowCategoryModal(false)
       setEditingCategory(null)
-      setCategoryForm({ name: '', description: '', color: '#667eea', icon: '📚' })
+      setCategoryForm({ name: '', description: '', color: '#667eea', icon: 'Book' })
       loadCategories()
     } catch (error) {
       console.error('Error saving category:', error)
@@ -380,16 +397,16 @@ const [bookForm, setBookForm] = useState({
       <header style={styles.header}>
         <h1 style={styles.logo}>
           <Settings size={28} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-          Admin Dashboard
+         <span className="md:flex hidden "> Admin Dashboard</span> <span className="md:hidden flex text-2xl  "> Admin D...</span>
+
         </h1>
         <button onClick={handleLogout} style={styles.logoutButton}>
           <LogOut size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-          Déconnexion
+          <span className="md:flex hidden">Déconnexion</span>
         </button>
       </header>
 
       <div style={styles.content}>
-        {/* STATISTIQUES */}
         <div style={styles.statsGrid}>
           <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
             <Users size={40} style={{ marginBottom: '0.5rem' }} />
@@ -416,8 +433,7 @@ const [bookForm, setBookForm] = useState({
           </div>
         </div>
 
-        {/* TABS */}
-        <div style={styles.tabs}>
+        <div style={styles.tabs} className="md:flex grid">
           <button
             onClick={() => setActiveTab('payments')}
             style={{
@@ -450,13 +466,11 @@ const [bookForm, setBookForm] = useState({
           </button>
         </div>
 
-        {/* CONTENU */}
         <div style={styles.tabContent}>
           {loading ? (
             <div style={styles.loading}>Chargement...</div>
           ) : (
             <>
-              {/* TAB PAIEMENTS */}
               {activeTab === 'payments' && (
                 <div>
                   <h2 style={styles.sectionTitle}>Liste des paiements</h2>
@@ -532,7 +546,6 @@ const [bookForm, setBookForm] = useState({
                     </div>
                   )}
 
-                  {/* SECTION UTILISATEURS */}
                   <h2 style={{ ...styles.sectionTitle, marginTop: '3rem' }}>
                     Utilisateurs inscrits ({users.length})
                   </h2>
@@ -568,7 +581,6 @@ const [bookForm, setBookForm] = useState({
                 </div>
               )}
 
-              {/* TAB CATÉGORIES */}
               {activeTab === 'categories' && (
                 <div>
                   <div style={styles.sectionHeader}>
@@ -576,13 +588,13 @@ const [bookForm, setBookForm] = useState({
                     <button
                       onClick={() => {
                         setEditingCategory(null)
-                        setCategoryForm({ name: '', description: '', color: '#667eea', icon: '📚' })
+                        setCategoryForm({ name: '', description: '', color: '#667eea', icon: 'Book' })
                         setShowCategoryModal(true)
                       }}
                       style={styles.addButton}
                     >
                       <Plus size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                      Nouvelle catégorie
+                      <span className='md:flex hidden'>Nouvelle catégorie</span>
                     </button>
                   </div>
 
@@ -625,7 +637,6 @@ const [bookForm, setBookForm] = useState({
                 </div>
               )}
 
-              {/* TAB LIVRES */}
               {activeTab === 'books' && (
                 <div>
                   <div style={styles.sectionHeader}>
@@ -659,9 +670,12 @@ const [bookForm, setBookForm] = useState({
                     {books.map((book) => (
                       <div key={book.id} style={styles.bookCard}>
                         <img
-                          src={book.cover_url || 'https://via.placeholder.com/150x200/667eea/ffffff?text=Livre'}
+                          src={getDirectImageUrl(book.cover_url)}
                           alt={book.title}
                           style={styles.bookCover}
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://via.placeholder.com/150x200/667eea/ffffff?text=Livre'
+                          }}
                         />
                         <div style={styles.bookInfo}>
                           <h3 style={styles.bookTitle}>{book.title}</h3>
@@ -717,7 +731,6 @@ const [bookForm, setBookForm] = useState({
         </div>
       </div>
 
-      {/* MODAL CATÉGORIE */}
       {showCategoryModal && (
         <div style={styles.modal} onClick={() => setShowCategoryModal(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -772,7 +785,6 @@ const [bookForm, setBookForm] = useState({
         </div>
       )}
 
-      {/* MODAL LIVRE */}
       {showBookModal && (
         <div style={styles.modal} onClick={() => setShowBookModal(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -823,8 +835,11 @@ const [bookForm, setBookForm] = useState({
                 value={bookForm.cover_url}
                 onChange={(e) => setBookForm({ ...bookForm, cover_url: e.target.value })}
                 style={styles.input}
-                placeholder="https://drive.google.com/file/d/..."
+                placeholder="https://drive.google.com/file/d/1abc123.../view"
               />
+              <p style={{ fontSize: '0.85rem', color: '#666', margin: '0.25rem 0 0 0' }}>
+                💡 Astuce : Partagez l'image publiquement sur Drive et copiez le lien complet
+              </p>
 
               <label style={styles.label}>Lien Google Drive *</label>
               <input
@@ -950,7 +965,6 @@ const styles = {
   statValue: { fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.25rem' },
   statLabel: { fontSize: '0.9rem', opacity: 0.9 },
   tabs: {
-    display: 'flex',
     gap: '1rem',
     marginBottom: '2rem',
     background: 'white',
@@ -1197,6 +1211,7 @@ const styles = {
     width: '100%',
     height: '200px',
     objectFit: 'cover' as const,
+    backgroundColor: '#f0f0f0',
   },
   bookInfo: {
     padding: '1rem',
