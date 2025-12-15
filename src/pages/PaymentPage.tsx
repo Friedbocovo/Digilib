@@ -60,7 +60,7 @@ export default function PaymentPage() {
     const cleanPhone = userPhone.replace(/\s/g, '').replace(/^\+/, '')
     
     // Bénin : 229XXXXXXXX (12 chiffres) ou XXXXXXXX (8 chiffres)
-    const isBeninPhone = /^(229)?[0-9]{8,10}$/.test(cleanPhone)
+    const isBeninPhone = /^[0-9]{8,10}$/.test(cleanPhone)
     
     // International : +XXXXXXXXXXX (10-15 chiffres)
     const isInternationalPhone = /^[0-9]{10,15}$/.test(cleanPhone)
