@@ -217,8 +217,8 @@ export default function LibraryPage() {
                 <User size={32} style={{ marginBottom: '0.5rem' }} />
                 <h2 style={styles.greetingText}>Bienvenue, {userName}</h2>
               </div>
-              <h2 style={styles.welcomeTitle}>Explorez notre bibliothèque</h2>
-              <p style={styles.welcomeSubtitle}>Choisissez une catégorie pour découvrir nos livres</p>
+              <h2 style={styles.welcomeTitle}>Explorez votre bibliothèque</h2>
+              <p style={styles.welcomeSubtitle}>Choisissez une catégorie pour découvrir vos livres</p>
             </div>
 
             <div style={styles.categoriesGrid}>

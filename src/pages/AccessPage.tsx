@@ -192,7 +192,7 @@ export default function AccessPage() {
 
       <div style={styles.content}>
         <div style={styles.card}>
-          <h1 style={styles.title}>📚 Free Books</h1>
+          <h1 style={styles.title}>📚 DigiLib</h1>
           <p style={styles.subtitle}>
             {step === 'info' 
               ? 'Accédez à votre bibliothèque' 
