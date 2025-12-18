@@ -1,8 +1,9 @@
-import { BookOpen, Download, Grid, User, ArrowRight, Star, Mail, ChevronDown } from 'lucide-react'
+import { BookOpen, MessageCircleMore, Download, Grid, User, ArrowRight, Star, Mail, ChevronDown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
-import Video from './vid_ebook3.mp4'
+import { useState } from 'react'
+import Video from "./vid_ebook3.mp4"
+import BG from "./bg2.jpg"
+import Logo from "./logo2.png"
 
 interface FreeBook {
   id: string
@@ -10,7 +11,6 @@ interface FreeBook {
   author?: string
   cover_url: string
   drive_link: string
-  drive_file_id?: string
 }
 
 interface FAQ {
@@ -21,7 +21,7 @@ interface FAQ {
 const faqs: FAQ[] = [
   {
     question: "Comment ça marche ?",
-    answer: "C'est simple ! Payez une seule fois 3000 XAF via Mobile Money (MTN, Moov ou Celtiis), et accédez à vie à notre bibliothèque complète de milliers de livres. Vous pouvez lire en ligne ou télécharger gratuitement tous les livres que vous voulez."
+    answer: "C'est simple ! Payez une seule fois 5000 XAF via Mobile Money (MTN, Moov ou Celtiis), et accédez à vie à notre bibliothèque complète de milliers de livres. Vous pouvez lire en ligne ou télécharger gratuitement tous les livres que vous voulez."
   },
   {
     question: "Quels sont les modes de paiement ?",
@@ -29,7 +29,7 @@ const faqs: FAQ[] = [
   },
   {
     question: "Est-ce vraiment un accès à vie ?",
-    answer: "Oui, absolument ! Un seul paiement de 3000 FCFA vous donne un accès illimité et permanent à toute notre bibliothèque. Pas d'abonnement mensuel, pas de frais cachés. Vous payez une fois et c'est pour toujours."
+    answer: "Oui, absolument ! Un seul paiement de 5000 FCFA vous donne un accès illimité et permanent à toute notre bibliothèque. Pas d'abonnement mensuel, pas de frais cachés. Vous payez une fois et c'est pour toujours."
   },
   {
     question: "Puis-je télécharger les livres ?",
@@ -41,28 +41,31 @@ const faqs: FAQ[] = [
   }
 ]
 
+// LIVRES GRATUITS EN DUR
+const freeBooks: FreeBook[] = [
+  {
+    id: '1',
+    title: '7 exercices pour durer plus longtemps',
+    cover_url: 'https://drive.google.com/file/d/1jCwHs9qHytb3HLrvSmpwFA7MksibOdOs/view?usp=drivesdk',
+    drive_link: 'https://drive.google.com/file/d/1O7SXPt_34TEz5BN8pqr8m2eCbBiwBIlr/view?usp=drivesdk'
+  },
+  {
+    id: '2',
+    title: 'Réussir sa prise de parole en public',
+    cover_url: 'https://drive.google.com/file/d/1KlLb2abtBsEBLlMKFwp1pxML01IdVM7R/view?usp=drivesdk',
+    drive_link: 'https://drive.google.com/file/d/1lglrtiug7ummMqW-fuM3KeDx-Ht7Etrx/view?usp=sharing'
+  },
+  {
+    id: '3',
+    title: '10 bonnes raisons de devenir entrepreneur',
+    cover_url: 'https://drive.google.com/file/d/1_43l2OLOeZ3JCHsNZ9Wo0uAxeSwPeAyv/view?usp=drivesdk',
+    drive_link: 'https://drive.google.com/file/d/1UhjD6CVuFhWs0eFamwbDyuNNKpRm6kY6/view?usp=sharing'
+  }
+]
+
 export default function HomePage() {
   const navigate = useNavigate()
-  const [freeBooks, setFreeBooks] = useState<FreeBook[]>([])
   const [openFAQ, setOpenFAQ] = useState<number | null>(null)
-
-  useEffect(() => {
-    loadFreeBooks()
-  }, [])
-
-  const loadFreeBooks = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('books')
-        .select('id, title, author, cover_url, drive_link, drive_file_id')
-        .limit(5)
-
-      if (error) throw error
-      setFreeBooks(data || [])
-    } catch (error) {
-      console.error('Erreur chargement livres gratuits:', error)
-    }
-  }
 
   const handleAccessLibrary = () => {
     navigate('/access')
@@ -72,27 +75,22 @@ export default function HomePage() {
     navigate('/admin-login')
   }
 
-  const handleDownloadFreeBook = async (book: FreeBook) => {
+  const handleDownloadFreeBook = (book: FreeBook) => {
     try {
-      let downloadUrl = book.drive_link
-
-      if (book.drive_file_id) {
-        downloadUrl = `https://drive.google.com/uc?export=download&id=${book.drive_file_id}`
-      } else if (book.drive_link.includes('drive.google.com')) {
-        const match = book.drive_link.match(/\/d\/([a-zA-Z0-9_-]+)/)
-        if (match && match[1]) {
-          downloadUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`
-        }
+      // Extraire l'ID du fichier Google Drive
+      const match = book.drive_link.match(/\/d\/([a-zA-Z0-9_-]+)/)
+      if (match && match[1]) {
+        const fileId = match[1]
+        const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`
+        window.open(downloadUrl, '_blank')
+      } else {
+        // Si on ne peut pas extraire l'ID, ouvrir le lien original
+        window.open(book.drive_link, '_blank')
       }
-
-      window.open(downloadUrl, '_blank')
-
-      await supabase
-        .from('books')
-        .update({ downloads: (book as any).downloads + 1 })
-        .eq('id', book.id)
     } catch (error) {
       console.error('Erreur téléchargement:', error)
+      // Fallback: ouvrir le lien original
+      window.open(book.drive_link, '_blank')
     }
   }
 
@@ -100,14 +98,14 @@ export default function HomePage() {
     if (!coverUrl) {
       return 'https://via.placeholder.com/200x280/667eea/ffffff?text=Livre'
     }
-    
-    if (coverUrl.includes('drive.google.com')) {
-      const fileIdMatch = coverUrl.match(/\/d\/([a-zA-Z0-9_-]+)/)
-      if (fileIdMatch && fileIdMatch[1]) {
-        return `https://drive.google.com/thumbnail?id=${fileIdMatch[1]}&sz=w300`
-      }
+
+    // Extraire l'ID du fichier Google Drive
+    const fileIdMatch = coverUrl.match(/\/d\/([a-zA-Z0-9_-]+)/)
+    if (fileIdMatch && fileIdMatch[1]) {
+      // Utiliser l'API thumbnail de Google Drive
+      return `https://drive.google.com/thumbnail?id=${fileIdMatch[1]}&sz=w400`
     }
-    
+
     return coverUrl
   }
 
@@ -123,24 +121,25 @@ export default function HomePage() {
         muted
         playsInline
         style={styles.video}
+        className='md:flex hidden'
       >
         <source src={Video} type="video/mp4" />
       </video>
 
+      <img src={BG} alt="BG" className='md:hidden flex' style={styles.video} />
+
       <div style={styles.content}>
         <header style={styles.header}>
-          <div style={styles.logo}>
-            <BookOpen size={32} strokeWidth={2.5} />
+          <div style={styles.logo} className="flex">
+            <img src={Logo} alt="Logo" className="md:h-15 md:w-15 h-10 w-10" />
             <span style={styles.logoText}>DigiLib</span>
           </div>
-          <button
-            onClick={handleAdminLogin}
-            style={styles.adminBtn}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+<button
+            onClick={handleAccessLibrary}
+           className='h-12 w-auto flex items-center gap-2 bg-white text-purple-600 font-semibold px-4 rounded-lg hover:shadow-lg transition-shadow duration-300'
           >
-            <User size={18} />
-            <span>Admin</span>
+            <span className='md:flex hidden'>Accéder à la Bibliothèque</span>
+            <ArrowRight size={22} strokeWidth={2.5} />
           </button>
         </header>
 
@@ -208,46 +207,44 @@ export default function HomePage() {
           </button>
 
           {/* SECTION LIVRES GRATUITS */}
-          {freeBooks.length > 0 && (
-            <div style={styles.freeBooksSection}>
-              <h2 style={styles.freeBooksTitle}>
-                📚 Découvrez nos livres gratuits
-              </h2>
-              <p style={styles.freeBooksSubtitle}>
-                Téléchargez gratuitement ces 5 livres pour découvrir notre bibliothèque
-              </p>
+          <div style={styles.freeBooksSection}>
+            <h2 style={styles.freeBooksTitle}>
+              📚 Découvrez nos livres gratuits
+            </h2>
+            <p style={styles.freeBooksSubtitle}>
+              Téléchargez gratuitement ces livres pour découvrir notre bibliothèque
+            </p>
 
-              <div style={styles.freeBooksGrid}>
-                {freeBooks.map((book) => (
-                  <div key={book.id} style={styles.freeBookCard}>
-                    <img
-                      src={getCoverImageUrl(book.cover_url)}
-                      alt={book.title}
-                      style={styles.freeBookCover}
-                      onError={(e) => {
-                        e.currentTarget.src = 'https://via.placeholder.com/200x280/667eea/ffffff?text=Livre'
-                      }}
-                    />
-                    <div style={styles.freeBookInfo}>
-                      <h3 style={styles.freeBookTitle}>{book.title}</h3>
-                      {book.author && (
-                        <p style={styles.freeBookAuthor}>{book.author}</p>
-                      )}
-                      <button
-                        onClick={() => handleDownloadFreeBook(book)}
-                        style={styles.downloadFreeButton}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
-                      >
-                        <Download size={18} />
-                        <span>Télécharger</span>
-                      </button>
-                    </div>
+            <div style={styles.freeBooksGrid}>
+              {freeBooks.map((book) => (
+                <div key={book.id} style={styles.freeBookCard}>
+                  <img
+                    src={getCoverImageUrl(book.cover_url)}
+                    alt={book.title}
+                    style={styles.freeBookCover}
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://via.placeholder.com/200x280/667eea/ffffff?text=Livre'
+                    }}
+                  />
+                  <div style={styles.freeBookInfo}>
+                    <h3 style={styles.freeBookTitle}>{book.title}</h3>
+                    {book.author && (
+                      <p style={styles.freeBookAuthor}>{book.author}</p>
+                    )}
+                    <button
+                      onClick={() => handleDownloadFreeBook(book)}
+                      style={styles.downloadFreeButton}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
+                    >
+                      <Download size={18} />
+                      <span>Télécharger</span>
+                    </button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
 
           {/* SECTION FAQ */}
           <div style={styles.faqSection}>
@@ -267,15 +264,15 @@ export default function HomePage() {
                     }}
                   >
                     <span>{faq.question}</span>
-                    <ChevronDown 
-                      size={24} 
+                    <ChevronDown
+                      size={24}
                       style={{
                         transition: 'transform 0.3s ease',
                         transform: openFAQ === index ? 'rotate(180deg)' : 'rotate(0deg)'
                       }}
                     />
                   </button>
-                  
+
                   {openFAQ === index && (
                     <div style={styles.faqAnswer}>
                       <p>{faq.answer}</p>
@@ -293,7 +290,7 @@ export default function HomePage() {
             {/* LOGO (Gauche) */}
             <div style={styles.footerSection}>
               <div style={styles.footerLogo}>
-                <BookOpen size={40} strokeWidth={2.5} />
+            <img src={Logo} alt="Logo" className="md:h-15 md:w-15 h-10 w-10" />
                 <span style={styles.footerLogoText}>DigiLib</span>
               </div>
               <p style={styles.footerTagline}>
@@ -309,15 +306,18 @@ export default function HomePage() {
                   <Mail size={18} />
                   <span>flybrary4@gmail.com</span>
                 </a>
-                <span style={{color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem'}}>
-                  MTN : +229 0162463476
-                </span>
-                <span style={{color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem'}}>
-                  MOOV : +229 0158142580
-                </span>
-                <span style={{color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem'}}>
-                  CELTIIS : +229 0141822980
-                </span>
+                <a
+                  href="https://wa.me/22901624634?text=Bonjour%2C%20j'aimerais%20avoir%20acc%C3%A8s%20%C3%A0%20la%20biblioth%C3%A8que%20DigiLib"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ ...styles.contactLink, cursor: 'pointer' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = '#25D366'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
+                >
+                  <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem' }} className='flex items-center gap-2'>
+                    <MessageCircleMore size={20} strokeWidth={2} />MTN : +229 01 41 82 29 80
+                  </span>
+                  </a>
               </div>
             </div>
 
@@ -325,7 +325,7 @@ export default function HomePage() {
             <div style={styles.footerSection}>
               <h3 style={styles.footerTitle}>Liens Rapides</h3>
               <div style={styles.faqLinks}>
-                <button 
+                <button
                   onClick={handleAccessLibrary}
                   style={styles.faqLink}
                 >
@@ -441,6 +441,7 @@ const styles = {
     fontWeight: '800',
     marginBottom: '1.5rem',
     lineHeight: '1.1',
+    fontFamily: '"Itim',
     letterSpacing: '-2px',
     textShadow: '0 4px 20px rgba(0,0,0,0.2)',
   },
@@ -506,7 +507,7 @@ const styles = {
     boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
     marginBottom: '4rem',
   },
-  
+
   // SECTION LIVRES GRATUITS
   freeBooksSection: {
     width: '100%',
@@ -525,8 +526,9 @@ const styles = {
   },
   freeBooksGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))',
-    gap: 'clamp(1rem, 3vw, 2rem)',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))',
+    gap: 'clamp(1.5rem, 4vw, 2.5rem)',
+    justifyItems: 'center',
   },
   freeBookCard: {
     background: 'rgba(255,255,255,0.15)',
@@ -534,13 +536,16 @@ const styles = {
     overflow: 'hidden',
     backdropFilter: 'blur(20px)',
     border: '1px solid rgba(255,255,255,0.2)',
-    transition: 'transform 0.3s ease',
+    transition: 'transform 0.3s ease, box-shadow 0.3s ease',
     cursor: 'pointer',
+    width: '100%',
+    maxWidth: '280px',
   },
   freeBookCover: {
     width: '100%',
-    height: 'clamp(220px, 30vw, 280px)',
+    height: 'clamp(280px, 35vw, 350px)',
     objectFit: 'cover' as const,
+    backgroundColor: '#f0f0f0',
   },
   freeBookInfo: {
     padding: 'clamp(1rem, 3vw, 1.5rem)',
@@ -550,6 +555,8 @@ const styles = {
     fontWeight: '700',
     marginBottom: '0.5rem',
     color: 'white',
+    minHeight: '2.5rem',
+    lineHeight: '1.3',
   },
   freeBookAuthor: {
     fontSize: 'clamp(0.85rem, 2vw, 0.9rem)',

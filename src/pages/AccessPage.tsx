@@ -172,6 +172,10 @@ export default function AccessPage() {
     }
   }
 
+   const handleBack = () => {
+    navigate('/')
+  }
+
   return (
     <div style={styles.container}>
       {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
@@ -238,6 +242,10 @@ export default function AccessPage() {
               >
                 {loading ? 'Vérification...' : 'Continuer →'}
               </button>
+
+                        <button onClick={handleBack} style={styles.backButton}>
+          Retour à l'accueil
+        </button>
 
               {isReturningUser && (
                 <p style={styles.info}>
@@ -323,13 +331,25 @@ const styles = {
     objectFit: 'cover' as const,
     zIndex: 0,
   },
+    backButton: {
+    width: '100%',
+    background: 'transparent',
+    color: '#10b981',
+    padding: '0.75rem',
+    border: '2px solid #10b981',
+    borderRadius: '10px',
+    fontSize: '1rem',
+    cursor: 'pointer',
+    fontWeight: 'bold' as const,
+    transition: 'background 0.3s',
+  },
   overlay: {
     position: 'fixed' as const,
     top: 0,
     left: 0,
     width: '100%',
     height: '100%',
-    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.85) 0%, rgba(118, 75, 162, 0.85) 100%)',
+    background: 'linear-gradient(135deg, rgba(227, 229, 233, 0.1) 0%, rgba(210, 209, 212, 0.3) 100%)',
     zIndex: 1,
   },
   content: {

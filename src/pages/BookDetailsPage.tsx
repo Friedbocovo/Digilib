@@ -183,16 +183,7 @@ export default function BookDetailsPage() {
                 e.currentTarget.src = 'https://via.placeholder.com/400x600/667eea/ffffff?text=Erreur+image'
               }}
             />
-            <div style={styles.stats}>
-              <div style={styles.stat}>
-                <Eye size={24} style={{ color: '#667eea' }} />
-                <span style={styles.statValue}>{book.views || 0} vues</span>
-              </div>
-              <div style={styles.stat}>
-                <Download size={24} style={{ color: '#10b981' }} />
-                <span style={styles.statValue}>{book.downloads || 0} téléchargements</span>
-              </div>
-            </div>
+
           </div>
 
           {/* COLONNE DROITE: Détails */}

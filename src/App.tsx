@@ -6,10 +6,13 @@ import LibraryPage from './pages/LibraryPage'
 import BookDetailsPage from './pages/BookDetailsPage'
 import AdminLoginPage from './pages/AdminLoginPage'
 import AdminPage from './pages/AdminPage'
+import InstallPrompt from './components/InstallPrompt'
+
 
 function App() {
   return (
     <Router>
+            <InstallPrompt />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/access" element={<AccessPage />} />
