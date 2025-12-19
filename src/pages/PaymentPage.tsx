@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
 import { ArrowLeft, Mail, Phone, CreditCard, Check, Loader, User } from 'lucide-react'
 
-// ⚠️ MODE SIMULATION
+// ⚠️ MODE SIMULATION 
 const SIMULATION_MODE = false
 
 const MAKETOU_API_KEY = import.meta.env.VITE_MAKETOU_API_KEY
