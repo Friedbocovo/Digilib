@@ -14,7 +14,7 @@ import {
 import Video from './vid_ebook2.mp4'
 
 // ⚠️ MODE SIMULATION 
-const SIMULATION_MODE = true
+const SIMULATION_MODE = false
 
 const MAKETOU_API_KEY = import.meta.env.VITE_MAKETOU_API_KEY || ''
 const MAKETOU_PRODUCT_ID = import.meta.env.VITE_MAKETOU_PRODUCT_ID || ''

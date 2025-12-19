@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
+import Logo from './logo2.png'
 import { 
   BookOpen, 
   LogOut, 
@@ -199,7 +200,8 @@ export default function LibraryPage() {
       
       <header style={styles.header}>
         <h1 style={styles.logo}>
-          <BookOpen size={28} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
+            <img src={Logo} alt="Logo" className="md:h-15 md:w-15 h-10 w-10" />
+
           DigiLib
         </h1>
         <button onClick={handleLogout} style={styles.logoutButton}>
