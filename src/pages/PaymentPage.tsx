@@ -14,7 +14,7 @@ import {
 import Video from './vid_ebook2.mp4'
 
 // ⚠️ MODE SIMULATION 
-const SIMULATION_MODE = false
+const SIMULATION_MODE = true
 
 const MAKETOU_API_KEY = import.meta.env.VITE_MAKETOU_API_KEY || ''
 const MAKETOU_PRODUCT_ID = import.meta.env.VITE_MAKETOU_PRODUCT_ID || ''
@@ -56,19 +56,18 @@ export default function PaymentPage() {
       return
     }
 
-    // Validation du téléphone spécifique au Bénin
+    // Validation du téléphone plus stricte
     const cleanPhone = userPhone.replace(/\s/g, '').replace(/^\+/, '')
     
-    // Format Bénin : doit commencer par 01 (8 chiffres) ou 22901 (11 chiffres)
-    const isBeninFormat8 = /^[0-9]{8}$/.test(cleanPhone) // 01XXXXXXXX ( chiffres)
-    const isBeninFormat11 = /^22901[0-9]{8}$/.test(cleanPhone) // 22901XXXXXXXX (13 chiffres)
+    // Bénin : 229XXXXXXXX (12 chiffres) ou XXXXXXXX (8 chiffres)
+    const isBeninPhone = /^(229)?[0-9]{8,10}$/.test(cleanPhone)
     
-    // Format international (10-15 chiffres, mais pas Bénin)
-    const isInternational = /^[0-9]{10,15}$/.test(cleanPhone) && !cleanPhone.startsWith('229')
+    // International : +XXXXXXXXXXX (10-15 chiffres)
+    const isInternationalPhone = /^[0-9]{10,15}$/.test(cleanPhone)
     
-    if (!isBeninFormat8 && !isBeninFormat11 && !isInternational) {
+    if (!isBeninPhone && !isInternationalPhone) {
       setPopup({ 
-        message: 'Format de numéro invalide.\n\nFormats acceptés :\n• Bénin : 01XXXXXXXX (ex: 0197234567)\n• Bénin : 22901XXXXXXXX (ex: 2299701234567)\n• International : +33612345678', 
+        message: 'Numéro invalide. Format Bénin: 229XXXXXXXX (ex: 22990123456) ou international complet', 
         type: 'error' 
       })
       return
@@ -111,26 +110,13 @@ export default function PaymentPage() {
         const firstName = nameParts[0]
         const lastName = nameParts.slice(1).join(' ') || firstName
 
-        // Formater le numéro de téléphone pour Bénin
-        let formattedPhone = cleanPhone
-        if (!cleanPhone.startsWith('+')) {
-          // Si le numéro commence par 22901, ajouter le +
-          if (cleanPhone.startsWith('22901')) {
-            formattedPhone = `+${cleanPhone}`
-          }
-          // Si c'est un numéro à 10 chiffres commençant par 01 (Bénin), ajouter +229
-          else if (cleanPhone.length === 10 && cleanPhone.startsWith('01')) {
-            formattedPhone = `+229${cleanPhone}`
-          }
-          // Sinon, ajouter le + pour international
-          else {
-            formattedPhone = `+${cleanPhone}`
-          }
-        }
-
         console.log('📦 Création du panier Maketou...')
-        console.log('📞 Numéro formaté:', formattedPhone)
+        console.log('🔑 API Key présente:', !!MAKETOU_API_KEY)
+        console.log('📦 Product ID:', MAKETOU_PRODUCT_ID)
 
+        // Déterminer l'URL de redirection
+        // En production (Vercel), utiliser le vrai domaine
+        // En développement (localhost), ne pas mettre de redirectURL car Maketou le refuse
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         
         const payload: any = {
@@ -138,19 +124,21 @@ export default function PaymentPage() {
           email: cleanEmail,
           firstName: firstName,
           lastName: lastName,
-          phone: formattedPhone,
+          phone: cleanPhone.startsWith('+') ? cleanPhone : `+${cleanPhone}`,
           meta: {
             source: 'digilib-website',
             userName: cleanName
           }
         }
 
+        // Ajouter redirectURL seulement en production
         if (!isLocalhost) {
           payload.redirectURL = `${window.location.origin}/library`
         }
 
         console.log('📤 Payload envoyé:', JSON.stringify(payload, null, 2))
 
+        // Créer le panier Maketou
         const response = await fetch('https://api.maketou.net/api/v1/stores/cart/checkout', {
           method: 'POST',
           headers: {
@@ -162,41 +150,50 @@ export default function PaymentPage() {
 
         const data = await response.json()
         console.log('📥 Réponse Maketou:', data)
+        console.log('📥 Message d\'erreur brut:', data.message)
+        
+        // Si c'est un array, afficher chaque élément
+        if (Array.isArray(data.message)) {
+          data.message.forEach((msg, index) => {
+            console.log(`📥 Message ${index}:`, JSON.stringify(msg, null, 2))
+          })
+        }
 
         if (response.ok && data.redirectUrl) {
           console.log('✅ Panier créé:', data.cart.id)
           
+          // Sauvegarder l'ID du panier pour vérification ultérieure
           localStorage.setItem('maketou_cart_id', data.cart.id)
           localStorage.setItem('user_name', cleanName)
           localStorage.setItem('user_email', cleanEmail)
-          localStorage.setItem('user_phone', formattedPhone)
+          localStorage.setItem('user_phone', cleanPhone)
 
+          // Rediriger vers la page de paiement Maketou
           window.location.href = data.redirectUrl
         } else {
-          // Gérer les erreurs de format de numéro spécifiquement
+          // Gérer les messages d'erreur (peut être un array ou un string)
           let errorMessage = 'Erreur lors de la création du panier'
           
           if (data.message) {
-            // Si c'est une erreur de validation du numéro
-            if (JSON.stringify(data.message).includes('phoneNumber') || 
-                JSON.stringify(data.message).includes('phone')) {
-              errorMessage = `Format de numéro invalide.\n\nFormats acceptés:\n• Bénin: 0190123456 ou 2290190123456\n• International: +33612345678`
-            }
-            // Sinon, extraire le message d'erreur
-            else if (Array.isArray(data.message)) {
+            if (Array.isArray(data.message)) {
+              // Si c'est un array d'objets, extraire les messages
               const messages = data.message.map(msg => {
                 if (typeof msg === 'string') return msg
                 if (msg.message) return msg.message
                 if (msg.error) return msg.error
-                return 'Erreur inconnue'
-              }).filter(msg => msg !== 'Erreur inconnue')
-              errorMessage = messages.length > 0 ? messages.join(', ') : errorMessage
+                return JSON.stringify(msg)
+              })
+              errorMessage = messages.join(', ')
             } else if (typeof data.message === 'string') {
               errorMessage = data.message
+            } else if (typeof data.message === 'object') {
+              errorMessage = data.message.message || JSON.stringify(data.message)
             }
           }
           
-          console.error('❌ Erreur Maketou:', data)
+          console.error('❌ Erreur Maketou complète:', data)
+          console.error('❌ Message formaté:', errorMessage)
+          
           setPopup({ message: errorMessage, type: 'error' })
           throw new Error(errorMessage)
         }
@@ -221,6 +218,7 @@ export default function PaymentPage() {
 
       console.log('📝 Enregistrement du paiement dans Supabase...')
 
+      // Créer ou récupérer l'utilisateur
       let userId = null
       const { data: existingUser } = await supabase
         .from('users')
@@ -230,6 +228,7 @@ export default function PaymentPage() {
 
       if (existingUser) {
         userId = existingUser.id
+        // Mettre à jour le statut de paiement
         await supabase
           .from('users')
           .update({ has_paid: true })
@@ -249,6 +248,7 @@ export default function PaymentPage() {
         userId = newUser?.id
       }
 
+      // Enregistrer le paiement
       const { data, error } = await supabase.from('payments').insert({
         user_id: userId,
         user_email: cleanEmail,
@@ -268,6 +268,7 @@ export default function PaymentPage() {
 
       console.log('✅ Paiement enregistré:', data)
 
+      // Sauvegarder dans localStorage
       localStorage.setItem('library_access_token', accessToken)
       localStorage.setItem('user_email', cleanEmail)
       localStorage.setItem('user_name', cleanName)
@@ -351,22 +352,15 @@ export default function PaymentPage() {
               </label>
               <input
                 type="tel"
-                placeholder="01234567 ou 22901234567"
+                placeholder="90123456 ou 229XXXXXXXX"
                 value={userPhone}
                 onChange={(e) => setUserPhone(e.target.value)}
                 style={styles.input}
                 required
               />
-              <div style={styles.phoneHintBox}>
-                <p style={styles.phoneHint}>
-                  <strong>Formats acceptés :</strong>
-                </p>
-                <ul style={styles.phoneHintList}>
-                  <li>🇧🇯 Bénin : 01234567 (10 chiffres commençant par 01)</li>
-                  <li>🇧🇯 Bénin : 22901234567 (avec indicatif pays)</li>
-                  <li>🌍 International : +33612345678</li>
-                </ul>
-              </div>
+              <p style={styles.phoneHint}>
+                Entrez votre numéro Mobile Money (MTN, Moov)
+              </p>
             </div>
             
             <button type="submit" style={styles.nextButton}>
@@ -510,26 +504,7 @@ const styles = {
     width: '100%',
     transition: 'border-color 0.3s',
   },
-  phoneHintBox: {
-    background: '#f0f9ff',
-    border: '1px solid #bae6fd',
-    borderRadius: '8px',
-    padding: '0.75rem',
-    marginTop: '0.5rem',
-  },
-  phoneHint: { 
-    fontSize: '0.875rem', 
-    color: '#0369a1', 
-    margin: '0 0 0.5rem 0',
-    fontWeight: 'bold' as const,
-  },
-  phoneHintList: {
-    fontSize: '0.875rem',
-    color: '#075985',
-    margin: 0,
-    paddingLeft: '1.5rem',
-    listStyle: 'none',
-  },
+  phoneHint: { fontSize: '0.875rem', color: '#666', marginTop: '0.5rem' },
   nextButton: {
     background: '#667eea',
     color: 'white',

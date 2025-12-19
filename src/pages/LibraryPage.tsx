@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
 import Logo from './logo2.png'
-import { 
-  BookOpen, 
-  LogOut, 
-  ArrowLeft, 
-  Search, 
-  Download, 
+import '../index.css'
+import {
+  BookOpen,
+  LogOut,
+  ArrowLeft,
+  Search,
+  Download,
   Eye,
   ArrowRight,
   User
@@ -54,14 +55,14 @@ export default function LibraryPage() {
     if (!coverUrl) {
       return 'https://via.placeholder.com/280x400/667eea/ffffff?text=Pas+de+couverture'
     }
-    
+
     if (coverUrl.includes('drive.google.com')) {
       const fileIdMatch = coverUrl.match(/\/d\/([a-zA-Z0-9_-]+)/)
       if (fileIdMatch && fileIdMatch[1]) {
         return `https://drive.google.com/thumbnail?id=${fileIdMatch[1]}&sz=w400`
       }
     }
-    
+
     return coverUrl
   }
 
@@ -69,20 +70,20 @@ export default function LibraryPage() {
     if (driveFileId) {
       return `https://drive.google.com/uc?export=download&id=${driveFileId}`
     }
-    
+
     if (driveLink && driveLink.includes('drive.google.com')) {
       const match = driveLink.match(/\/d\/([a-zA-Z0-9_-]+)/)
       if (match && match[1]) {
         return `https://drive.google.com/uc?export=download&id=${match[1]}`
       }
     }
-    
+
     return driveLink
   }
 
   const handleDownload = async (book: Book, e: React.MouseEvent) => {
     e.stopPropagation()
-    
+
     setPopup({ message: 'Téléchargement en cours...', type: 'info' })
 
     try {
@@ -95,7 +96,7 @@ export default function LibraryPage() {
       if (bookData) {
         const finalUrl = getDirectDownloadLink(bookData.drive_link, bookData.drive_file_id)
         window.open(finalUrl, '_blank')
-        
+
         await supabase
           .from('books')
           .update({ downloads: (bookData.downloads || 0) + 1 })
@@ -181,8 +182,8 @@ export default function LibraryPage() {
   }
 
   const filteredBooks = selectedCategory
-    ? books.filter(book => book.category_id === selectedCategory && 
-        book.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? books.filter(book => book.category_id === selectedCategory &&
+      book.title.toLowerCase().includes(searchQuery.toLowerCase()))
     : []
 
   if (loading) {
@@ -195,149 +196,157 @@ export default function LibraryPage() {
   }
 
   return (
-    <div style={styles.container}>
-      {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
-      
-      <header style={styles.header}>
-        <h1 style={styles.logo}>
+    <>
+      <div style={styles.container} className='container'>
+
+        {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
+
+        <header style={styles.header}>
+          <h1 style={styles.logo}>
             <img src={Logo} alt="Logo" className="md:h-15 md:w-15 h-10 w-10" />
 
-          DigiLib
-        </h1>
-        <button onClick={handleLogout} style={styles.logoutButton}>
-          <LogOut size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-          Quitter
-        </button>
-      </header>
+            DigiLib
+          </h1>
+          <button onClick={handleLogout} style={styles.logoutButton}>
+            <LogOut size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
+            Quitter
+          </button>
+        </header>
 
-      <div style={styles.content}>
-        {!selectedCategory ? (
-          // VUE CATÉGORIES
-          <>
-            <div style={styles.welcomeSection}>
-              <div style={styles.userGreeting}>
-                <User size={32} style={{ marginBottom: '0.5rem' }} />
-                <h2 style={styles.greetingText}>Bienvenue, {userName}</h2>
-              </div>
-              <h2 style={styles.welcomeTitle}>Explorez votre bibliothèque</h2>
-              <p style={styles.welcomeSubtitle}>Choisissez une catégorie pour découvrir vos livres</p>
-            </div>
-
-            <div style={styles.categoriesGrid}>
-              {categories.map((category) => (
-                <div
-                  key={category.id}
-                  onClick={() => handleCategoryClick(category.id)}
-                  style={{
-                    ...styles.categoryCard,
-                    background: `linear-gradient(135deg, ${category.color}ee 0%, ${category.color}cc 100%)`,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-10px) scale(1.03)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0) scale(1)'
-                  }}
-                >
-                  <div style={styles.categoryIcon}>{category.icon}</div>
-                  <h3 style={styles.categoryName}>{category.name}</h3>
-                  <p style={styles.categoryDesc}>{category.description}</p>
-                  <div style={styles.categoryArrow}>
-                    <ArrowRight size={24} />
-                  </div>
+        <div style={styles.content}>
+          {!selectedCategory ? (
+            // VUE CATÉGORIES
+            <>
+              <div style={styles.welcomeSection}>
+                <div style={styles.userGreeting} className=''>
+                  <User size={32} style={{ marginBottom: '0.5rem' }} />
+                  <h2 style={styles.greetingText}>Bienvenue, {userName}</h2>
                 </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          // VUE LIVRES
-          <>
-            <div style={styles.breadcrumb}>
-              <button 
-                onClick={() => setSelectedCategory(null)}
-                style={styles.backButton}
-              >
-                <ArrowLeft size={20} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                Retour aux catégories
-              </button>
-              <h2 style={styles.categoryTitle}>
-                {categories.find(c => c.id === selectedCategory)?.icon}{' '}
-                {categories.find(c => c.id === selectedCategory)?.name}
-              </h2>
-            </div>
+                <h2 style={styles.welcomeTitle}>Explorez votre bibliothèque</h2>
+                <p style={styles.welcomeSubtitle}>Choisissez une catégorie pour découvrir vos livres</p>
+              </div>
 
-            <div style={styles.searchBar}>
-              <Search size={20} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
-              <input
-                type="text"
-                placeholder="Rechercher un livre..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={styles.searchInput}
-              />
-            </div>
-
-            {filteredBooks.length === 0 ? (
-              <p style={styles.emptyMessage}>Aucun livre dans cette catégorie</p>
-            ) : (
-              <div style={styles.booksGrid}>
-                {filteredBooks.map((book) => (
-                  <div 
-                    key={book.id} 
-                    style={styles.bookCard}
-                    onClick={() => handleBookClick(book.id)}
+              <div style={styles.categoriesGrid}>
+                {categories.map((category) => (
+                  <div
+                    key={category.id}
+                    onClick={() => handleCategoryClick(category.id)}
+                    style={{
+                      ...styles.categoryCard,
+                      background: `linear-gradient(135deg, ${category.color}ee 0%, ${category.color}cc 100%)`,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-10px) scale(1.03)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0) scale(1)'
+                    }}
                   >
-                    <img
-                      src={getCoverImageUrl(book.cover_url)}
-                      alt={book.title}
-                      style={styles.bookCover}
-                      onError={(e) => {
-                        e.currentTarget.src = 'https://via.placeholder.com/280x400/667eea/ffffff?text=Erreur+image'
-                      }}
-                    />
-                    <div style={styles.bookInfo}>
-                      <h3 style={styles.bookTitle}>{book.title}</h3>
-                      {book.author && (
-                        <p style={styles.bookAuthor}>Par {book.author}</p>
-                      )}
-                      <p style={styles.bookDescription}>
-                        {book.description.substring(0, 100)}...
-                      </p>
-                      <div style={styles.bookActions}>
-                        <button 
-                          style={styles.detailsButton}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleBookClick(book.id)
-                          }}
-                        >
-                          <Eye size={16} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                          Voir plus
-                        </button>
-                        <button 
-                          style={styles.downloadButtonSmall}
-                          onClick={(e) => handleDownload(book, e)}
-                        >
-                          <Download size={16} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                          Télécharger
-                        </button>
-                      </div>
+                    <div style={styles.categoryIcon}>{category.icon}</div>
+                    <h3 style={styles.categoryName}>{category.name}</h3>
+                    <p style={styles.categoryDesc}>{category.description}</p>
+                    <div style={styles.categoryArrow}>
+                      <ArrowRight size={24} />
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </>
-        )}
+            </>
+          ) : (
+            // VUE LIVRES
+            <>
+              <div style={styles.breadcrumb}>
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  style={styles.backButton}
+                >
+                  <ArrowLeft size={20} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
+                  Retour aux catégories
+                </button>
+                <h2 style={styles.categoryTitle}>
+                  {categories.find(c => c.id === selectedCategory)?.icon}{' '}
+                  {categories.find(c => c.id === selectedCategory)?.name}
+                </h2>
+              </div>
+
+              <div style={styles.searchBar}>
+                <Search size={20} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
+                <input
+                  type="text"
+                  placeholder="Rechercher un livre..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={styles.searchInput}
+                />
+              </div>
+
+              {filteredBooks.length === 0 ? (
+                <p style={styles.emptyMessage}>Aucun livre dans cette catégorie</p>
+              ) : (
+                <div style={styles.booksGrid}>
+                  {filteredBooks.map((book) => (
+                    <div
+                      key={book.id}
+                      style={styles.bookCard}
+                      onClick={() => handleBookClick(book.id)}
+                    >
+                      <img
+                        src={getCoverImageUrl(book.cover_url)}
+                        style={styles.bookCover}
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://via.placeholder.com/280x400/667eea/ffffff?text=Erreur+image'
+                        }}
+                      />
+                      <div style={styles.bookInfo}>
+                        <h3 style={styles.bookTitle}>{book.title}</h3>
+                        {book.author && (
+                          <p style={styles.bookAuthor}>Par {book.author}</p>
+                        )}
+                        <p style={styles.bookDescription}>
+                          {book.description.substring(0, 100)}...
+                        </p>
+                        <div style={styles.bookActions}>
+                          <button
+                            style={styles.detailsButton}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleBookClick(book.id)
+                            }}
+                          >
+                            <Eye size={16} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
+                            Voir plus
+                          </button>
+                          <button
+                            style={styles.downloadButtonSmall}
+                            onClick={(e) => handleDownload(book, e)}
+                            className='w-full justify-center items-center'
+                          >
+                            <Download size={16} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
+                            Télécharger
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
+
+    </>
+
   )
 }
 
 const styles = {
-  container: { minHeight: '100vh', background: '#f5f5f5' },
+  container: {
+    minHeight: '100vh',
+  },
+
   header: {
-    background: 'white',
+    background: 'rgba(16, 6, 6, 0.8)',
     padding: '1rem 1.5rem',
     display: 'flex',
     justifyContent: 'space-between',
@@ -347,11 +356,11 @@ const styles = {
     top: 0,
     zIndex: 100,
   },
-  logo: { 
-    margin: 0, 
-    color: '#667eea', 
+  logo: {
+    margin: 0,
+    color: 'rgba(102, 126, 234, 1)',
     fontSize: 'clamp(1.2rem, 4vw, 1.5rem)',
-    display: 'flex', 
+    display: 'flex',
     alignItems: 'center',
     fontWeight: 'bold',
   },
@@ -369,13 +378,13 @@ const styles = {
     gap: '0.3rem',
     transition: 'all 0.3s',
   },
-  content: { 
-    maxWidth: '1400px', 
-    margin: '0 auto', 
+  content: {
+    maxWidth: '1400px',
+    margin: '0 auto',
     padding: 'clamp(1rem, 3vw, 2rem)',
   },
-  welcomeSection: { 
-    textAlign: 'center' as const, 
+  welcomeSection: {
+    textAlign: 'center' as const,
     marginBottom: 'clamp(2rem, 5vw, 3rem)',
   },
   userGreeting: {
@@ -384,7 +393,8 @@ const styles = {
     alignItems: 'center',
     marginBottom: '1.5rem',
     padding: '1.5rem',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    opacity: 0.9,
+    background: 'linear-gradient(135deg, #667eeaff 50%, #422b5aff 50%)',
     borderRadius: '20px',
     color: 'white',
     boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)',
@@ -394,15 +404,15 @@ const styles = {
     fontWeight: '700',
     margin: 0,
   },
-  welcomeTitle: { 
-    fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', 
-    color: '#333', 
+  welcomeTitle: {
+    fontSize: 'clamp(1.8rem, 5vw, 2.5rem)',
+    color: '#ffffffff',
     marginBottom: '0.5rem',
     fontWeight: '700',
   },
-  welcomeSubtitle: { 
-    fontSize: 'clamp(1rem, 3vw, 1.1rem)', 
-    color: '#666',
+  welcomeSubtitle: {
+    fontSize: 'clamp(1rem, 3vw, 1.1rem)',
+    color: '#d4d7deff',
   },
   categoriesGrid: {
     display: 'grid',
@@ -455,12 +465,12 @@ const styles = {
     gap: '0.5rem',
     transition: 'all 0.3s',
   },
-  categoryTitle: { 
-    fontSize: 'clamp(1.5rem, 5vw, 2rem)', 
-    color: '#333', 
+  categoryTitle: {
+    fontSize: 'clamp(1.5rem, 5vw, 2rem)',
+    color: '#ffffffff',
     margin: '1rem 0',
   },
-  searchBar: { 
+  searchBar: {
     marginBottom: '2rem',
     position: 'relative' as const,
   },
@@ -471,6 +481,7 @@ const styles = {
     border: '2px solid #e0e0e0',
     borderRadius: '12px',
     outline: 'none',
+    color:'white',
     transition: 'border-color 0.3s',
   },
   booksGrid: {
@@ -486,32 +497,32 @@ const styles = {
     transition: 'transform 0.3s, box-shadow 0.3s',
     cursor: 'pointer',
   },
-  bookCover: { 
-    width: '100%', 
-    height: 'clamp(300px, 40vw, 350px)', 
+  bookCover: {
+    width: '100%',
+    height: 'clamp(300px, 40vw, 350px)',
     objectFit: 'cover' as const,
   },
   bookInfo: { padding: 'clamp(1rem, 3vw, 1.5rem)' },
-  bookTitle: { 
-    margin: '0 0 0.5rem 0', 
-    color: '#333', 
-    fontSize: 'clamp(1rem, 3vw, 1.2rem)', 
+  bookTitle: {
+    margin: '0 0 0.5rem 0',
+    color: '#333',
+    fontSize: 'clamp(1rem, 3vw, 1.2rem)',
     fontWeight: '700',
   },
-  bookAuthor: { 
-    margin: '0 0 0.75rem 0', 
-    color: '#667eea', 
-    fontSize: 'clamp(0.85rem, 2.5vw, 0.9rem)', 
+  bookAuthor: {
+    margin: '0 0 0.75rem 0',
+    color: '#667eea',
+    fontSize: 'clamp(0.85rem, 2.5vw, 0.9rem)',
     fontWeight: '600',
   },
-  bookDescription: { 
-    color: '#666', 
-    fontSize: 'clamp(0.85rem, 2.5vw, 0.9rem)', 
-    marginBottom: '1rem', 
+  bookDescription: {
+    color: '#666',
+    fontSize: 'clamp(0.85rem, 2.5vw, 0.9rem)',
+    marginBottom: '1rem',
     lineHeight: 1.5,
   },
-  bookActions: { 
-    display: 'flex', 
+  bookActions: {
+    display: 'flex',
     gap: '0.5rem',
     flexWrap: 'wrap' as const,
   },
@@ -572,9 +583,9 @@ const styles = {
     animation: 'spin 1s linear infinite',
     marginBottom: '1.5rem',
   },
-  loadingText: { 
-    fontSize: 'clamp(1rem, 3vw, 1.25rem)', 
-    fontWeight: '600', 
+  loadingText: {
+    fontSize: 'clamp(1rem, 3vw, 1.25rem)',
+    fontWeight: '600',
     color: 'white',
     textAlign: 'center' as const,
   },

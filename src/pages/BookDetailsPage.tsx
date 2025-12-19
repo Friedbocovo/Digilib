@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
-import { 
-  ArrowLeft, 
-  Eye, 
-  Download, 
-  BookOpen, 
-  Clock 
+import '../index.css'
+import {
+  ArrowLeft,
+  Eye,
+  Download,
+  BookOpen,
+  Clock
 } from 'lucide-react'
 
 interface Book {
@@ -47,14 +48,14 @@ export default function BookDetailsPage() {
     if (!coverUrl) {
       return 'https://via.placeholder.com/400x600/667eea/ffffff?text=Pas+de+couverture'
     }
-    
+
     if (coverUrl.includes('drive.google.com')) {
       const fileIdMatch = coverUrl.match(/\/d\/([a-zA-Z0-9_-]+)/)
       if (fileIdMatch && fileIdMatch[1]) {
         return `https://drive.google.com/thumbnail?id=${fileIdMatch[1]}&sz=w600`
       }
     }
-    
+
     return coverUrl
   }
 
@@ -62,14 +63,14 @@ export default function BookDetailsPage() {
     if (driveFileId) {
       return `https://drive.google.com/uc?export=download&id=${driveFileId}`
     }
-    
+
     if (driveLink && driveLink.includes('drive.google.com')) {
       const match = driveLink.match(/\/d\/([a-zA-Z0-9_-]+)/)
       if (match && match[1]) {
         return `https://drive.google.com/uc?export=download&id=${match[1]}`
       }
     }
-    
+
     return driveLink
   }
 
@@ -161,9 +162,9 @@ export default function BookDetailsPage() {
   }
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} className='container'>
       {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
-      
+
       <div style={styles.header}>
         <button onClick={() => navigate('/library')} style={styles.backButton}>
           <ArrowLeft size={20} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
@@ -175,8 +176,8 @@ export default function BookDetailsPage() {
         <div style={styles.bookLayout}>
           {/* COLONNE GAUCHE: Image */}
           <div style={styles.leftColumn}>
-            <img 
-              src={getCoverImageUrl(book.cover_url)} 
+            <img
+              src={getCoverImageUrl(book.cover_url)}
               alt={book.title}
               style={styles.coverImage}
               onError={(e) => {
@@ -189,7 +190,7 @@ export default function BookDetailsPage() {
           {/* COLONNE DROITE: Détails */}
           <div style={styles.rightColumn}>
             {book.categories && (
-              <div 
+              <div
                 style={{
                   ...styles.categoryBadge,
                   background: book.categories.color
@@ -200,7 +201,7 @@ export default function BookDetailsPage() {
             )}
 
             <h1 style={styles.title}>{book.title}</h1>
-            
+
             {book.author && (
               <p style={styles.author}>Par {book.author}</p>
             )}
@@ -238,7 +239,7 @@ export default function BookDetailsPage() {
             </div>
 
             <div style={styles.actions}>
-              <button 
+              <button
                 onClick={handleRead}
                 style={styles.readButton}
                 onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
@@ -247,8 +248,8 @@ export default function BookDetailsPage() {
                 <BookOpen size={20} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
                 Lire en ligne
               </button>
-              
-              <button 
+
+              <button
                 onClick={handleDownload}
                 disabled={downloading}
                 style={{
@@ -281,9 +282,9 @@ export default function BookDetailsPage() {
 }
 
 const styles = {
-  container: { minHeight: '100vh', background: '#f5f5f5' },
+  container: { minHeight: '100vh' },
   header: {
-    background: 'white',
+    background: 'rgba(16, 6, 6, 0.8)',
     padding: 'clamp(1rem, 3vw, 1.5rem)',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
     position: 'sticky' as const,
@@ -304,9 +305,9 @@ const styles = {
     gap: '0.5rem',
     transition: 'all 0.3s',
   },
-  content: { 
-    maxWidth: '1200px', 
-    margin: '0 auto', 
+  content: {
+    maxWidth: '1200px',
+    margin: '0 auto',
     padding: 'clamp(1rem, 4vw, 3rem) clamp(1rem, 3vw, 2rem)',
   },
   bookLayout: {
@@ -326,7 +327,7 @@ const styles = {
     aspectRatio: '2 / 3',
     objectFit: 'cover' as const,
     borderRadius: '20px',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+    boxShadow: '0 20px 60px rgba(255, 255, 255, 1)',
     margin: '0 auto',
   },
   stats: {
@@ -344,9 +345,9 @@ const styles = {
     gap: '0.75rem',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
   },
-  statValue: { 
-    fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)', 
-    fontWeight: '600', 
+  statValue: {
+    fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)',
+    fontWeight: '600',
     color: '#333',
   },
   rightColumn: {
