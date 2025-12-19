@@ -12,7 +12,8 @@ import {
   Download,
   Eye,
   ArrowRight,
-  User
+  User,
+  MessageCircleMore
 } from 'lucide-react'
 
 interface Category {
@@ -333,6 +334,21 @@ export default function LibraryPage() {
             </>
           )}
         </div>
+
+        <footer className='fixed flex justify-center items-center h-[100px] w-[50px] bg-red-500' >
+           <a
+                            href="https://wa.me/22941822980?text=Bonjour%2C%20j'aimerais%20avoir%20acc%C3%A8s%20%C3%A0%20la%20biblioth%C3%A8que%20DigiLib"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ ...styles.contactLink, cursor: 'pointer' }}
+                            onMouseEnter={(e) => e.currentTarget.style.color = '#25D366'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
+                          >
+                            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem' }} className='flex items-center gap-2'>
+                              <MessageCircleMore size={20} strokeWidth={2} />Pous nous contacter cliquer ici
+                            </span>
+                            </a>
+        </footer>
       </div>
 
     </>
@@ -377,6 +393,15 @@ const styles = {
     alignItems: 'center',
     gap: '0.3rem',
     transition: 'all 0.3s',
+  },
+  contactLink: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    color: 'rgba(255,255,255,0.8)',
+    textDecoration: 'none',
+    transition: 'color 0.3s ease',
+    fontSize: 'clamp(0.85rem, 2vw, 0.95rem)',
   },
   content: {
     maxWidth: '1400px',
