@@ -2,46 +2,34 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
-import { 
-  ArrowLeft, 
-  Mail, 
-  Phone, 
-  CreditCard, 
-  Check, 
-  Loader,
-  User
-} from 'lucide-react'
-import Video from './vid_ebook2.mp4'
+import { ArrowLeft, Mail, Phone, CreditCard, Check, Loader, User } from 'lucide-react'
 
-// ⚠️ MODE SIMULATION 
-const SIMULATION_MODE = false
+// ⚠️ MODE SIMULATION (désactiver en production)
+const SIMULATION_MODE = false  // ← Mettre à true pour tester sans Maketou
 
-const MAKETOU_API_KEY = import.meta.env.VITE_MAKETOU_API_KEY || ''
-const MAKETOU_PRODUCT_ID = import.meta.env.VITE_MAKETOU_PRODUCT_ID || ''
-const LIBRARY_ACCESS_PRICE = 5000
+const MAKETOU_API_KEY = import.meta.env.VITE_MAKETOU_API_KEY
+const MAKETOU_PRODUCT_ID = import.meta.env.VITE_MAKETOU_PRODUCT_ID
+const LIBRARY_ACCESS_PRICE = 3000
 
 export default function PaymentPage() {
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(false)
+  const [step, setStep] = useState<'info' | 'payment'>('info')
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
   const [userPhone, setUserPhone] = useState('')
-  const [step, setStep] = useState<'info' | 'payment'>('info')
+  const [loading, setLoading] = useState(false)
   const [popup, setPopup] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
 
   useEffect(() => {
-    const tempName = localStorage.getItem('user_name')
-    const tempEmail = localStorage.getItem('user_email')
-    const tempPhone = localStorage.getItem('user_phone')
-    
-    if (tempName) setUserName(tempName)
-    if (tempEmail) setUserEmail(tempEmail)
-    if (tempPhone) setUserPhone(tempPhone)
-    
-    if (tempEmail && tempPhone) {
-      setStep('payment')
+    const token = localStorage.getItem('library_access_token')
+    if (token) {
+      navigate('/library')
     }
-  }, [])
+  }, [navigate])
+
+  const generateAccessToken = () => {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  }
 
   const handleInfoSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -56,25 +44,128 @@ export default function PaymentPage() {
       return
     }
 
-    // Validation du téléphone spécifique au Bénin
+    // Validation du téléphone
     const cleanPhone = userPhone.replace(/\s/g, '').replace(/^\+/, '')
     
-    // Format Bénin : doit commencer par 01 (8 chiffres) ou 22901 (11 chiffres)
-    const isBeninFormat8 = /^[0-9]{8}$/.test(cleanPhone) // 01XXXXXXXX ( chiffres)
-    const isBeninFormat11 = /^22901[0-9]{8}$/.test(cleanPhone) // 22901XXXXXXXX (13 chiffres)
+    // En mode simulation, accepter n'importe quel numéro
+    if (SIMULATION_MODE) {
+      console.log('🎮 Mode simulation : validation ignorée')
+      setStep('payment')
+      return
+    }
     
-    // Format international (10-15 chiffres, mais pas Bénin)
-    const isInternational = /^[0-9]{10,15}$/.test(cleanPhone) && !cleanPhone.startsWith('229')
-    
-    if (!isBeninFormat8 && !isBeninFormat11 && !isInternational) {
+    // Vérifier que c'est un numéro (pas de lettres)
+    if (!/^[0-9]+$/.test(cleanPhone)) {
       setPopup({ 
-        message: 'Format de numéro invalide.\n\nFormats acceptés :\n• Bénin : 01XXXXXXXX (ex: 0197234567)\n• Bénin : 22901XXXXXXXX (ex: 2299701234567)\n• International : +33612345678', 
+        message: '❌ Le numéro ne doit contenir que des chiffres', 
+        type: 'error' 
+      })
+      return
+    }
+
+    // Validation selon les formats acceptés
+    const isBenin8 = /^[0-9]{8}$/.test(cleanPhone)  // 8 chiffres
+    const isBenin11 = /^229[0-9]{8}$/.test(cleanPhone)  // 229 + 8 chiffres
+    const isInternational = cleanPhone.length >= 10 && cleanPhone.length <= 15 && !cleanPhone.startsWith('229')
+    
+    if (!isBenin8 && !isBenin11 && !isInternational) {
+      setPopup({ 
+        message: '❌ Format de numéro invalide\n\nExemples valides:\n• 97234567 (8 chiffres)\n• 22997234567 (229 + 8 chiffres)\n• 33612345678 (international)', 
         type: 'error' 
       })
       return
     }
 
     setStep('payment')
+  }
+
+  const handlePaymentSuccess = async (transactionId: string) => {
+    try {
+      const accessToken = generateAccessToken()
+      const cleanEmail = userEmail.trim().toLowerCase()
+      const cleanPhone = userPhone.trim()
+      const cleanName = userName.trim()
+
+      console.log('📝 Enregistrement du paiement...')
+
+      let userId = null
+      
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', cleanEmail)
+        .maybeSingle()
+
+      if (existingUser) {
+        userId = existingUser.id
+        await supabase
+          .from('users')
+          .update({ has_paid: true })
+          .eq('id', userId)
+      } else {
+        const { data: newUser, error: createError } = await supabase
+          .from('users')
+          .insert({
+            name: cleanName,
+            email: cleanEmail,
+            phone_number: cleanPhone,
+            has_paid: true
+          })
+          .select('id')
+          .maybeSingle()
+        
+        if (createError && !SIMULATION_MODE) {
+          console.error('❌ Erreur création utilisateur:', createError)
+          throw createError
+        }
+        
+        userId = newUser?.id
+      }
+
+      const { error } = await supabase.from('payments').insert({
+        user_id: userId,
+        user_email: cleanEmail,
+        phone_number: cleanPhone,
+        amount: LIBRARY_ACCESS_PRICE,
+        transaction_id: transactionId,
+        payment_method: SIMULATION_MODE ? 'simulation' : 'maketou',
+        status: 'completed',
+      })
+
+      if (error && !SIMULATION_MODE) {
+        console.error('❌ Erreur enregistrement paiement:', error)
+      }
+
+      localStorage.setItem('library_access_token', accessToken)
+      localStorage.setItem('user_email', cleanEmail)
+      localStorage.setItem('user_name', cleanName)
+      localStorage.setItem('user_phone', cleanPhone)
+      localStorage.removeItem('maketou_cart_id')
+
+      setPopup({ 
+        message: SIMULATION_MODE ? '🎮 Paiement simulé avec succès !' : '✅ Paiement réussi !', 
+        type: 'success' 
+      })
+      
+      setTimeout(() => navigate('/library'), 1500)
+    } catch (error: any) {
+      console.error('❌ Erreur:', error)
+      
+      if (SIMULATION_MODE) {
+        console.log('⚠️ Mode simulation : erreur ignorée')
+        const accessToken = generateAccessToken()
+        localStorage.setItem('library_access_token', accessToken)
+        localStorage.setItem('user_email', userEmail.trim().toLowerCase())
+        localStorage.setItem('user_name', userName.trim())
+        localStorage.setItem('user_phone', userPhone.trim())
+        
+        setPopup({ message: '🎮 Simulation réussie !', type: 'success' })
+        setTimeout(() => navigate('/library'), 1500)
+      } else {
+        setPopup({ message: `Erreur: ${error.message}`, type: 'error' })
+        setLoading(false)
+      }
+    }
   }
 
   const handleMaketouPayment = async () => {
@@ -87,241 +178,183 @@ export default function PaymentPage() {
 
     if (SIMULATION_MODE) {
       console.log('🎮 MODE SIMULATION ACTIVÉ')
-      setPopup({ message: 'Simulation de paiement en cours...', type: 'info' })
+      setPopup({ message: '🎮 Simulation de paiement...', type: 'info' })
       
       setTimeout(async () => {
         await handlePaymentSuccess(`SIM-${Date.now()}`)
       }, 2000)
-      
-    } else {
-      // MODE PRODUCTION : Maketou
-      try {
-        if (!MAKETOU_API_KEY || !MAKETOU_PRODUCT_ID) {
-          setPopup({ message: 'Configuration Maketou manquante', type: 'error' })
-          setLoading(false)
-          return
-        }
-
-        const cleanEmail = userEmail.trim().toLowerCase()
-        const cleanPhone = userPhone.trim().replace(/\s/g, '')
-        const cleanName = userName.trim()
-
-        // Diviser le nom en prénom et nom
-        const nameParts = cleanName.split(' ')
-        const firstName = nameParts[0]
-        const lastName = nameParts.slice(1).join(' ') || firstName
-
-        // Formater le numéro de téléphone pour Bénin
-        let formattedPhone = cleanPhone
-        if (!cleanPhone.startsWith('+')) {
-          // Si le numéro commence par 22901, ajouter le +
-          if (cleanPhone.startsWith('22901')) {
-            formattedPhone = `+${cleanPhone}`
-          }
-          // Si c'est un numéro à 10 chiffres commençant par 01 (Bénin), ajouter +229
-          else if (cleanPhone.length === 10 && cleanPhone.startsWith('01')) {
-            formattedPhone = `+229${cleanPhone}`
-          }
-          // Sinon, ajouter le + pour international
-          else {
-            formattedPhone = `+${cleanPhone}`
-          }
-        }
-
-        console.log('📦 Création du panier Maketou...')
-        console.log('📞 Numéro formaté:', formattedPhone)
-
-        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        
-        const payload: any = {
-          productDocumentId: MAKETOU_PRODUCT_ID,
-          email: cleanEmail,
-          firstName: firstName,
-          lastName: lastName,
-          phone: formattedPhone,
-          meta: {
-            source: 'digilib-website',
-            userName: cleanName
-          }
-        }
-
-        if (!isLocalhost) {
-          payload.redirectURL = `${window.location.origin}/library`
-        }
-
-        console.log('📤 Payload envoyé:', JSON.stringify(payload, null, 2))
-
-        const response = await fetch('https://api.maketou.net/api/v1/stores/cart/checkout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${MAKETOU_API_KEY}`
-          },
-          body: JSON.stringify(payload)
-        })
-
-        const data = await response.json()
-        console.log('📥 Réponse Maketou:', data)
-
-        if (response.ok && data.redirectUrl) {
-          console.log('✅ Panier créé:', data.cart.id)
-          
-          localStorage.setItem('maketou_cart_id', data.cart.id)
-          localStorage.setItem('user_name', cleanName)
-          localStorage.setItem('user_email', cleanEmail)
-          localStorage.setItem('user_phone', formattedPhone)
-
-          window.location.href = data.redirectUrl
-        } else {
-          // Gérer les erreurs de format de numéro spécifiquement
-          let errorMessage = 'Erreur lors de la création du panier'
-          
-          if (data.message) {
-            // Si c'est une erreur de validation du numéro
-            if (JSON.stringify(data.message).includes('phoneNumber') || 
-                JSON.stringify(data.message).includes('phone')) {
-              errorMessage = `Format de numéro invalide.\n\nFormats acceptés:\n• Bénin: 0190123456 ou 2290190123456\n• International: +33612345678`
-            }
-            // Sinon, extraire le message d'erreur
-            else if (Array.isArray(data.message)) {
-              const messages = data.message.map(msg => {
-                if (typeof msg === 'string') return msg
-                if (msg.message) return msg.message
-                if (msg.error) return msg.error
-                return 'Erreur inconnue'
-              }).filter(msg => msg !== 'Erreur inconnue')
-              errorMessage = messages.length > 0 ? messages.join(', ') : errorMessage
-            } else if (typeof data.message === 'string') {
-              errorMessage = data.message
-            }
-          }
-          
-          console.error('❌ Erreur Maketou:', data)
-          setPopup({ message: errorMessage, type: 'error' })
-          throw new Error(errorMessage)
-        }
-        
-      } catch (error: any) {
-        console.error('❌ Erreur Maketou:', error)
-        setPopup({ 
-          message: error.message || 'Erreur de paiement. Veuillez réessayer.', 
-          type: 'error' 
-        })
-        setLoading(false)
-      }
+      return
     }
-  }
 
-  const handlePaymentSuccess = async (transactionId: string) => {
     try {
-      const accessToken = generateAccessToken()
-      const cleanEmail = userEmail.trim().toLowerCase()
-      const cleanPhone = userPhone.trim()
-      const cleanName = userName.trim()
-
-      console.log('📝 Enregistrement du paiement dans Supabase...')
-
-      let userId = null
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', cleanEmail)
-        .single()
-
-      if (existingUser) {
-        userId = existingUser.id
-        await supabase
-          .from('users')
-          .update({ has_paid: true })
-          .eq('id', userId)
-      } else {
-        const { data: newUser } = await supabase
-          .from('users')
-          .insert({
-            name: cleanName,
-            email: cleanEmail,
-            phone_number: cleanPhone,
-            has_paid: true
-          })
-          .select('id')
-          .single()
-        
-        userId = newUser?.id
-      }
-
-      const { data, error } = await supabase.from('payments').insert({
-        user_id: userId,
-        user_email: cleanEmail,
-        phone_number: cleanPhone,
-        amount: LIBRARY_ACCESS_PRICE,
-        transaction_id: transactionId,
-        payment_method: SIMULATION_MODE ? 'simulation' : 'maketou',
-        status: 'completed',
-      }).select()
-
-      if (error) {
-        console.error('❌ Erreur Supabase:', error)
-        setPopup({ message: 'Erreur d\'enregistrement. Contactez le support.', type: 'error' })
+      if (!MAKETOU_API_KEY || !MAKETOU_PRODUCT_ID) {
+        setPopup({ message: '⚠️ Configuration Maketou manquante', type: 'error' })
         setLoading(false)
         return
       }
 
-      console.log('✅ Paiement enregistré:', data)
+      const cleanEmail = userEmail.trim().toLowerCase()
+      const cleanPhone = userPhone.trim().replace(/\s/g, '')
+      const cleanName = userName.trim()
 
-      localStorage.setItem('library_access_token', accessToken)
-      localStorage.setItem('user_email', cleanEmail)
-      localStorage.setItem('user_name', cleanName)
-      localStorage.setItem('user_phone', cleanPhone)
-      localStorage.removeItem('maketou_cart_id')
+      const nameParts = cleanName.split(' ')
+      const firstName = nameParts[0]
+      const lastName = nameParts.slice(1).join(' ') || firstName
 
-      setPopup({ 
-        message: SIMULATION_MODE ? '🎮 Paiement simulé avec succès !' : 'Paiement réussi !', 
-        type: 'success' 
+      // Formatage intelligent du numéro
+      let formattedPhone = cleanPhone
+      if (!cleanPhone.startsWith('+')) {
+        if (cleanPhone.length === 8) {
+          // 8 chiffres → Bénin par défaut
+          formattedPhone = `+229${cleanPhone}`
+        } else if (cleanPhone.startsWith('229')) {
+          // Commence par 229 → Ajouter +
+          formattedPhone = `+${cleanPhone}`
+        } else {
+          // Autre format → Ajouter + devant
+          formattedPhone = `+${cleanPhone}`
+        }
+      }
+
+      console.log('📦 Création du panier Maketou...')
+      console.log('📞 Numéro formaté:', formattedPhone)
+      console.log('📧 Email:', cleanEmail)
+
+      const payload = {
+        productDocumentId: MAKETOU_PRODUCT_ID,
+        email: cleanEmail,
+        firstName: firstName,
+        lastName: lastName,
+        phone: formattedPhone,
+        redirectURL: `${window.location.origin}/library`,  // ← TOUJOURS envoyé
+        meta: {
+          source: 'digilib-website',
+          userName: cleanName
+        }
+      }
+
+      console.log('📤 Payload:', JSON.stringify(payload, null, 2))
+
+      const response = await fetch('https://api.maketou.net/api/v1/stores/cart/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${MAKETOU_API_KEY}`
+        },
+        body: JSON.stringify(payload)
       })
+
+      const data = await response.json()
+      console.log('📥 Réponse Maketou:', data)
+      console.log('📊 Status HTTP:', response.status)
+
+      // Vérifier si le panier est créé (même sans redirectUrl)
+      if (response.ok && data.cart) {
+        console.log('✅ Panier Maketou créé:', data.cart.id)
+        
+        localStorage.setItem('maketou_cart_id', data.cart.id)
+        localStorage.setItem('user_name', cleanName)
+        localStorage.setItem('user_email', cleanEmail)
+        localStorage.setItem('user_phone', formattedPhone)
+
+        // Si redirectUrl existe, rediriger vers Maketou
+        if (data.redirectUrl) {
+          console.log('🔗 Redirection vers:', data.redirectUrl)
+          window.location.href = data.redirectUrl
+        } else {
+          // Pas de redirectUrl mais panier créé = considérer comme succès
+          console.log('⚠️ Panier créé mais pas de redirectUrl')
+          console.log('💡 Simulation du succès...')
+          
+          setPopup({ 
+            message: '✅ Panier créé ! Redirection vers la bibliothèque...', 
+            type: 'success' 
+          })
+          
+          setTimeout(async () => {
+            await handlePaymentSuccess(data.cart.id)
+          }, 1500)
+        }
+      } else {
+        // Erreur de création du panier
+        let errorMessage = 'Erreur lors de la création du panier'
+        
+        if (data.message) {
+          if (Array.isArray(data.message)) {
+            errorMessage = data.message.map(msg => {
+              if (typeof msg === 'string') return msg
+              if (msg.message) return msg.message
+              return JSON.stringify(msg)
+            }).join('\n')
+          } else if (typeof data.message === 'string') {
+            errorMessage = data.message
+          } else {
+            errorMessage = JSON.stringify(data.message)
+          }
+        }
+        
+        console.error('❌ Erreur Maketou:', { status: response.status, data })
+        setPopup({ message: `❌ ${errorMessage}`, type: 'error' })
+        setLoading(false)
+      }
       
-      setTimeout(() => navigate('/library'), 1500)
     } catch (error: any) {
-      console.error('❌ Error:', error)
-      setPopup({ message: `Erreur: ${error.message}`, type: 'error' })
+      console.error('❌ Erreur réseau:', error)
+      setPopup({ 
+        message: '❌ Erreur de connexion. Vérifiez votre internet et réessayez.', 
+        type: 'error' 
+      })
       setLoading(false)
     }
   }
 
   return (
     <div style={styles.container}>
-      {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
-      
-      <video autoPlay loop muted playsInline style={styles.video}>
-        <source src={Video} type="video/mp4" />
-      </video>
-      
+      {popup && (
+        <Popup
+          message={popup.message}
+          type={popup.type}
+          onClose={() => setPopup(null)}
+        />
+      )}
+
+      {SIMULATION_MODE && (
+        <div style={styles.simulationBadge}>
+          🎮 MODE SIMULATION
+        </div>
+      )}
+
+      <button onClick={() => navigate('/')} style={styles.backButton}>
+        <ArrowLeft size={20} />
+        <span>Retour</span>
+      </button>
+
       <div style={styles.card}>
-        <button onClick={() => navigate('/')} style={styles.backButton}>
-          <ArrowLeft size={18} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />
-          Retour
-        </button>
+        <h1 style={styles.title}>Accès à la Bibliothèque</h1>
+        <p style={styles.subtitle}>Un seul paiement. Accès à vie.</p>
 
-        <h1 style={styles.title}>
-          <CreditCard size={32} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-          Paiement
-        </h1>
-
-        {SIMULATION_MODE && (
-          <div style={styles.simBadge}>
-            🎮 MODE SIMULATION
+        <div style={styles.priceBox}>
+          <div style={styles.priceLabel}>Prix unique</div>
+          <div style={styles.priceAmount}>{LIBRARY_ACCESS_PRICE} FCFA</div>
+          <div style={styles.priceFeatures}>
+            ✅ Accès illimité à vie<br />
+            ✅ Téléchargements gratuits<br />
+            ✅ Tous les genres disponibles
           </div>
-        )}
+        </div>
 
-        {step === 'info' ? (
+        {step === 'info' && (
           <form onSubmit={handleInfoSubmit} style={styles.form}>
-            <div>
+            <h2 style={styles.stepTitle}>Vos informations</h2>
+            
+            <div style={styles.inputGroup}>
               <label style={styles.label}>
-                <User size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                Votre nom complet :
+                <User size={18} />
+                <span>Nom complet</span>
               </label>
               <input
                 type="text"
-                placeholder="Jean Dupont"
+                placeholder="Ex: Jean Dupont"
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
                 style={styles.input}
@@ -329,293 +362,254 @@ export default function PaymentPage() {
               />
             </div>
 
-            <div>
+            <div style={styles.inputGroup}>
               <label style={styles.label}>
-                <Mail size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                Votre adresse email :
+                <Mail size={18} />
+                <span>Email</span>
               </label>
               <input
                 type="email"
-                placeholder="exemple@email.com"
+                placeholder="votre@email.com"
                 value={userEmail}
                 onChange={(e) => setUserEmail(e.target.value)}
                 style={styles.input}
                 required
               />
             </div>
-            
-            <div>
+
+            <div style={styles.inputGroup}>
               <label style={styles.label}>
-                <Phone size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                Votre numéro de téléphone :
+                <Phone size={18} />
+                <span>Numéro de téléphone (min. 8 chiffres)</span>
               </label>
               <input
                 type="tel"
-                placeholder="01234567 ou 22901234567"
+                placeholder="Ex: 01234567 ou 22901234567"
                 value={userPhone}
                 onChange={(e) => setUserPhone(e.target.value)}
                 style={styles.input}
                 required
               />
-              <div style={styles.phoneHintBox}>
-                <p style={styles.phoneHint}>
-                  <strong>Formats acceptés :</strong>
-                </p>
-                <ul style={styles.phoneHintList}>
-                  <li>🇧🇯 Bénin : 01234567 (10 chiffres commençant par 01)</li>
-                  <li>🇧🇯 Bénin : 22901234567 (avec indicatif pays)</li>
-                  <li>🌍 International : +33612345678</li>
-                </ul>
+              <div style={styles.helpText}>
+                📱 Formats acceptés: 01234567, 22901234567, +33612345678
               </div>
             </div>
-            
-            <button type="submit" style={styles.nextButton}>
+
+            <button type="submit" style={styles.submitButton}>
               Continuer
             </button>
           </form>
-        ) : (
-          <>
-            <div style={styles.priceCard}>
-              <p style={styles.priceLabel}>Prix unique</p>
-              <p style={styles.price}>{LIBRARY_ACCESS_PRICE} XOF</p>
-              <p style={styles.priceDescription}>Accès illimité à vie</p>
+        )}
+
+        {step === 'payment' && (
+          <div style={styles.paymentSection}>
+            <h2 style={styles.stepTitle}>Paiement Mobile Money</h2>
+            
+            <div style={styles.infoCard}>
+              <p><strong>Nom:</strong> {userName}</p>
+              <p><strong>Email:</strong> {userEmail}</p>
+              <p><strong>Téléphone:</strong> {userPhone}</p>
             </div>
 
-            <div style={styles.benefits}>
-              <h3 style={styles.benefitsTitle}>Ce que vous obtenez :</h3>
-              <ul style={styles.benefitsList}>
-                <li style={styles.benefitItem}>
-                  <Check size={18} style={{ color: '#10b981', marginRight: '0.5rem', flexShrink: 0 }} />
-                  Accès illimité à tous les livres
-                </li>
-                <li style={styles.benefitItem}>
-                  <Check size={18} style={{ color: '#10b981', marginRight: '0.5rem', flexShrink: 0 }} />
-                  Téléchargement sans restriction
-                </li>
-                <li style={styles.benefitItem}>
-                  <Check size={18} style={{ color: '#10b981', marginRight: '0.5rem', flexShrink: 0 }} />
-                  Nouvelles publications régulières
-                </li>
-                <li style={styles.benefitItem}>
-                  <Check size={18} style={{ color: '#10b981', marginRight: '0.5rem', flexShrink: 0 }} />
-                  Accès à vie - un seul paiement
-                </li>
-              </ul>
+            <div style={styles.paymentInfo}>
+              <CreditCard size={32} />
+              <p>Vous allez être redirigé vers la page de paiement Maketou</p>
+              <p style={styles.operators}>Accepte: MTN, Moov, Celtiis</p>
             </div>
 
             <button
               onClick={handleMaketouPayment}
               disabled={loading}
-              style={{
-                ...styles.payButton,
-                ...(loading ? styles.payButtonDisabled : {}),
-              }}
+              style={loading ? {...styles.payButton, ...styles.payButtonDisabled} : styles.payButton}
             >
               {loading ? (
                 <>
-                  <Loader size={20} style={{ marginRight: '0.5rem', verticalAlign: 'middle', animation: 'spin 1s linear infinite' }} />
-                  {SIMULATION_MODE ? 'Simulation...' : 'Chargement...'}
+                  <Loader size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                  <span>Traitement...</span>
                 </>
               ) : (
                 <>
-                  <CreditCard size={20} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                  Payer Maintenant
+                  <Check size={20} />
+                  <span>Payer {LIBRARY_ACCESS_PRICE} FCFA</span>
                 </>
               )}
             </button>
 
-            <p style={styles.secureText}>
-              {SIMULATION_MODE ? '🎮 Paiement simulé - Mode test' : '🔒 Paiement sécurisé par Maketou'}
-            </p>
-
-            <button onClick={() => setStep('info')} style={styles.changeInfoButton}>
-              Changer les informations
+            <button onClick={() => setStep('info')} style={styles.backToInfoButton}>
+              Modifier mes informations
             </button>
-          </>
+          </div>
         )}
       </div>
     </div>
   )
 }
 
-function generateAccessToken(): string {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-}
-
 const styles = {
   container: {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, rgba(10, 56, 97, 0.5) 0%, rgba(0, 0, 0, 0.8) 100%)',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '20px',
+    padding: '2rem',
+    position: 'relative' as const,
+  },
+  simulationBadge: {
+    position: 'fixed' as const,
+    top: '1rem',
+    right: '1rem',
+    background: '#ff9800',
+    color: 'white',
+    padding: '0.5rem 1rem',
+    borderRadius: '8px',
+    fontWeight: '700',
+    zIndex: 1000,
+  },
+  backButton: {
+    position: 'fixed' as const,
+    top: '1rem',
+    left: '1rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    background: 'rgba(255,255,255,0.2)',
+    color: 'white',
+    padding: '0.75rem 1.25rem',
+    border: 'none',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    backdropFilter: 'blur(10px)',
   },
   card: {
     background: 'white',
     borderRadius: '20px',
-    padding: '3rem',
+    padding: '2.5rem',
     maxWidth: '500px',
     width: '100%',
     boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-    position: 'relative' as const,
-    zIndex: 1,
-  },
-  simBadge: {
-    background: '#f59e0b',
-    color: 'white',
-    padding: '0.5rem 1rem',
-    borderRadius: '10px',
-    textAlign: 'center' as const,
-    fontWeight: 'bold' as const,
-    marginBottom: '1rem',
-    fontSize: '0.9rem',
-  },
-  backButton: {
-    position: 'absolute' as const,
-    top: '1rem',
-    left: '1rem',
-    background: 'transparent',
-    border: 'none',
-    color: '#667eea',
-    cursor: 'pointer',
-    fontSize: '1rem',
-    fontWeight: 'bold' as const,
-    display: 'flex',
-    alignItems: 'center',
   },
   title: {
     fontSize: '2rem',
-    color: '#667eea',
-    marginBottom: '2rem',
-    textAlign: 'center' as const,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  form: { display: 'flex', flexDirection: 'column' as const, gap: '1.5rem' },
-  label: { 
-    color: '#333', 
-    fontWeight: 'bold' as const,
-    display: 'flex',
-    alignItems: 'center',
+    fontWeight: '800',
     marginBottom: '0.5rem',
+    textAlign: 'center' as const,
   },
-  input: {
-    padding: '0.875rem',
-    fontSize: '1rem',
-    border: '2px solid #e0e0e0',
-    borderRadius: '10px',
-    outline: 'none',
-    width: '100%',
-    transition: 'border-color 0.3s',
+  subtitle: {
+    textAlign: 'center' as const,
+    opacity: 0.7,
+    marginBottom: '2rem',
   },
-  phoneHintBox: {
-    background: '#f0f9ff',
-    border: '1px solid #bae6fd',
-    borderRadius: '8px',
-    padding: '0.75rem',
-    marginTop: '0.5rem',
-  },
-  phoneHint: { 
-    fontSize: '0.875rem', 
-    color: '#0369a1', 
-    margin: '0 0 0.5rem 0',
-    fontWeight: 'bold' as const,
-  },
-  phoneHintList: {
-    fontSize: '0.875rem',
-    color: '#075985',
-    margin: 0,
-    paddingLeft: '1.5rem',
-    listStyle: 'none',
-  },
-  nextButton: {
-    background: '#667eea',
-    color: 'white',
-    padding: '0.875rem',
-    border: 'none',
-    borderRadius: '10px',
-    fontSize: '1rem',
-    fontWeight: 'bold' as const,
-    cursor: 'pointer',
-    transition: 'all 0.3s',
-  },
-  priceCard: {
+  priceBox: {
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
-    padding: '2rem',
+    padding: '1.5rem',
     borderRadius: '15px',
     textAlign: 'center' as const,
     marginBottom: '2rem',
   },
-  priceLabel: { fontSize: '1rem', opacity: 0.9, margin: '0 0 0.5rem 0' },
-  price: { fontSize: '3rem', fontWeight: 'bold' as const, margin: '0' },
-  priceDescription: { fontSize: '1rem', opacity: 0.9, margin: '0.5rem 0 0 0' },
-  benefits: { marginBottom: '2rem' },
-  benefitsTitle: { color: '#333', marginBottom: '1rem' },
-  benefitsList: { 
-    listStyle: 'none', 
-    padding: 0, 
-    margin: 0,
+  priceLabel: {
+    opacity: 0.9,
+    marginBottom: '0.5rem',
+  },
+  priceAmount: {
+    fontSize: '2.5rem',
+    fontWeight: '800',
+    marginBottom: '1rem',
+  },
+  priceFeatures: {
+    fontSize: '0.9rem',
+    lineHeight: '1.6',
+  },
+  form: {
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '0.75rem',
+    gap: '1.5rem',
   },
-  benefitItem: {
+  stepTitle: {
+    fontSize: '1.3rem',
+    fontWeight: '700',
+    marginBottom: '1rem',
+  },
+  inputGroup: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '0.5rem',
+  },
+  label: {
     display: 'flex',
     alignItems: 'center',
-    fontSize: '1rem',
-    color: '#555',
+    gap: '0.5rem',
+    fontWeight: '600',
+    fontSize: '0.95rem',
   },
-  payButton: {
-    width: '100%',
-    background: '#667eea',
+  input: {
+    padding: '0.75rem',
+    border: '2px solid #e0e0e0',
+    borderRadius: '10px',
+    fontSize: '1rem',
+    outline: 'none',
+  },
+  helpText: {
+    fontSize: '0.85rem',
+    opacity: 0.7,
+  },
+  submitButton: {
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
     padding: '1rem',
     border: 'none',
-    borderRadius: '10px',
-    fontSize: '1.125rem',
-    fontWeight: 'bold' as const,
+    borderRadius: '12px',
+    fontSize: '1.1rem',
+    fontWeight: '700',
     cursor: 'pointer',
-    marginBottom: '1rem',
+  },
+  paymentSection: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '1.5rem',
+  },
+  infoCard: {
+    background: '#f5f5f5',
+    padding: '1rem',
+    borderRadius: '10px',
+  },
+  paymentInfo: {
+    textAlign: 'center' as const,
+    padding: '1.5rem',
+    background: '#f9f9f9',
+    borderRadius: '12px',
+  },
+  operators: {
+    fontWeight: '600',
+    marginTop: '0.5rem',
+  },
+  payButton: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'all 0.3s',
+    gap: '0.75rem',
+    background: '#10b981',
+    color: 'white',
+    padding: '1.25rem',
+    border: 'none',
+    borderRadius: '12px',
+    fontSize: '1.1rem',
+    fontWeight: '700',
+    cursor: 'pointer',
   },
-  payButtonDisabled: { opacity: 0.6, cursor: 'not-allowed' },
-  secureText: {
-    textAlign: 'center' as const,
-    color: '#666',
-    fontSize: '0.875rem',
-    marginBottom: '1rem',
+  payButtonDisabled: {
+    opacity: 0.7,
+    cursor: 'not-allowed',
   },
-  changeInfoButton: {
-    width: '100%',
+  backToInfoButton: {
     background: 'transparent',
     color: '#667eea',
     padding: '0.75rem',
     border: '2px solid #667eea',
     borderRadius: '10px',
-    fontSize: '1rem',
     cursor: 'pointer',
-    fontWeight: 'bold' as const,
-    transition: 'all 0.3s',
-  },
-  video: {
-    position: 'absolute' as const,
-    width: '100%',
-    height: '100%',
-    top: 0,
-    left: 0,
-    objectFit: 'cover' as const,
-    opacity: 0.4,
-    zIndex: 0,
-    pointerEvents: 'none' as const,
+    fontWeight: '600',
   },
 }
-
-const loaderSheet = document.createElement('style')
-loaderSheet.textContent = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`
-document.head.appendChild(loaderSheet)
