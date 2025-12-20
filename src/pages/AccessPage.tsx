@@ -14,7 +14,7 @@ export default function AccessPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  const [city, setCity] = useState('')
+  const [city, setCity] = useState('') // ← NOUVEAU
   const [otp, setOtp] = useState('')
   const [generatedOtp, setGeneratedOtp] = useState('')
   const [loading, setLoading] = useState(false)
@@ -25,35 +25,17 @@ export default function AccessPage() {
   const [otpCode, setOTPCode] = useState('')
 
   useEffect(() => {
-    // 🔧 CORRECTION : Vérifier d'abord si l'utilisateur a déjà un accès complet
-    const accessToken = localStorage.getItem('library_access_token')
-    
-    if (accessToken) {
-      // Si l'utilisateur a déjà un token d'accès, le rediriger vers la bibliothèque
-      console.log('✅ Token d\'accès trouvé, redirection vers /library')
-      navigate('/library', { replace: true })
-      return
-    }
-
-    // Sinon, vérifier s'il y a un email sauvegardé (utilisateur de retour)
     const storedEmail = localStorage.getItem('user_email')
     if (storedEmail) {
-      console.log('📧 Email trouvé dans localStorage:', storedEmail)
       setIsReturningUser(true)
       setEmail(storedEmail)
-      
-      // Récupérer aussi le téléphone si disponible
-      const storedPhone = localStorage.getItem('user_phone')
-      if (storedPhone) {
-        setPhone(storedPhone)
-      }
     }
 
     registerOTPPopupCallback((code: string) => {
       setOTPCode(code)
       setShowOTPPopup(true)
     })
-  }, [navigate])
+  }, [])
 
   const generateOTP = (): string => {
     return Math.floor(100000 + Math.random() * 900000).toString()
@@ -85,10 +67,8 @@ export default function AccessPage() {
       const cleanPhone = phone.trim()
       const cleanCity = city.trim()
 
-      console.log('🔍 Vérification du paiement pour:', cleanEmail, cleanPhone)
-
       // Vérifier si l'utilisateur a déjà payé
-      const { data: paymentData, error: paymentError } = await supabase
+      const { data: paymentData } = await supabase
         .from('payments')
         .select('*')
         .ilike('user_email', cleanEmail)
@@ -96,17 +76,8 @@ export default function AccessPage() {
         .eq('status', 'completed')
         .limit(1)
 
-      if (paymentError) {
-        console.error('❌ Erreur lors de la vérification du paiement:', paymentError)
-        throw paymentError
-      }
-
-      console.log('💳 Résultat de la vérification:', paymentData)
-
       if (paymentData && paymentData.length > 0) {
         // Utilisateur a déjà payé → Générer et envoyer OTP
-        console.log('✅ Paiement trouvé, génération de l\'OTP')
-        
         const otpCode = generateOTP()
         setGeneratedOtp(otpCode)
 
@@ -125,7 +96,7 @@ export default function AccessPage() {
         if (emailSent) {
           localStorage.setItem('user_email', cleanEmail)
           localStorage.setItem('user_phone', cleanPhone)
-          localStorage.setItem('user_city', cleanCity)
+          localStorage.setItem('user_city', cleanCity) // ← NOUVEAU
           if (!isReturningUser && name.trim()) {
             localStorage.setItem('user_name', name.trim())
           }
@@ -137,25 +108,19 @@ export default function AccessPage() {
         }
       } else {
         // Utilisateur n'a pas payé → Rediriger vers paiement
-        console.log('⚠️ Aucun paiement trouvé, redirection vers /payment')
-        
         localStorage.setItem('user_email', cleanEmail)
         localStorage.setItem('user_phone', cleanPhone)
-        localStorage.setItem('user_city', cleanCity)
+        localStorage.setItem('user_city', cleanCity) // ← NOUVEAU
         if (!isReturningUser && name.trim()) {
           localStorage.setItem('user_name', name.trim())
         }
 
         setPopup({ message: 'Aucun paiement trouvé. Redirection...', type: 'info' })
-        
-        // 🔧 CORRECTION : Utiliser replace: true pour éviter le retour en arrière
-        setTimeout(() => {
-          navigate('/payment', { replace: true })
-        }, 1500)
+        setTimeout(() => navigate('/payment'), 1500)
       }
     } catch (error) {
-      console.error('❌ Erreur:', error)
-      setPopup({ message: 'Une erreur est survenue. Veuillez réessayer.', type: 'error' })
+      console.error('Erreur:', error)
+      setPopup({ message: 'Une erreur est survenue', type: 'error' })
     } finally {
       setLoading(false)
     }
@@ -201,11 +166,7 @@ export default function AccessPage() {
       localStorage.setItem('library_access_token', accessToken)
 
       setPopup({ message: 'Accès autorisé ! Redirection...', type: 'success' })
-      
-      // 🔧 CORRECTION : Utiliser replace: true
-      setTimeout(() => {
-        navigate('/library', { replace: true })
-      }, 1500)
+      setTimeout(() => navigate('/library'), 1500)
 
     } catch (error) {
       console.error('Erreur:', error)
@@ -238,7 +199,7 @@ export default function AccessPage() {
 
       <div style={styles.content}>
         <div style={styles.card}>
-          <h1 style={styles.title}>📚 DigiLib</h1>
+          <h1 style={styles.title}> DigiLib</h1>
           <p style={styles.subtitle}>
             {step === 'info' 
               ? 'Accédez à votre bibliothèque' 
@@ -307,9 +268,7 @@ export default function AccessPage() {
                     onClick={() => {
                       setIsReturningUser(false)
                       setEmail('')
-                      setPhone('')
                       localStorage.removeItem('user_email')
-                      localStorage.removeItem('user_phone')
                     }}
                     style={styles.linkButton}
                   >
