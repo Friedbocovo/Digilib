@@ -5,6 +5,8 @@ import { sendOTPEmail, registerOTPPopupCallback } from '../services/emailService
 import { OTPPopup } from '../components/OTPPopup'
 import { Popup } from '../components/Popup'
 import Video from './vid_ebook2.mp4'
+import Logo from "./logo2.png"
+
 
 export default function AccessPage() {
   const navigate = useNavigate()
@@ -12,13 +14,13 @@ export default function AccessPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [city, setCity] = useState('') // ← NOUVEAU
   const [otp, setOtp] = useState('')
   const [generatedOtp, setGeneratedOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [isReturningUser, setIsReturningUser] = useState(false)
   const [popup, setPopup] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   
-  // États pour la popup OTP
   const [showOTPPopup, setShowOTPPopup] = useState(false)
   const [otpCode, setOTPCode] = useState('')
 
@@ -29,7 +31,6 @@ export default function AccessPage() {
       setEmail(storedEmail)
     }
 
-    // Enregistrer le callback pour afficher la popup OTP
     registerOTPPopupCallback((code: string) => {
       setOTPCode(code)
       setShowOTPPopup(true)
@@ -49,7 +50,13 @@ export default function AccessPage() {
     }
 
     if (!email.trim() || !phone.trim()) {
-      setPopup({ message: 'Veuillez remplir tous les champs', type: 'error' })
+      setPopup({ message: 'Veuillez remplir tous les champs obligatoires', type: 'error' })
+      return
+    }
+
+    // Validation de la ville (optionnelle mais recommandée)
+    if (!isReturningUser && city.trim().length < 2) {
+      setPopup({ message: 'Veuillez entrer une ville valide', type: 'error' })
       return
     }
 
@@ -58,6 +65,7 @@ export default function AccessPage() {
     try {
       const cleanEmail = email.trim().toLowerCase()
       const cleanPhone = phone.trim()
+      const cleanCity = city.trim()
 
       // Vérifier si l'utilisateur a déjà payé
       const { data: paymentData } = await supabase
@@ -73,8 +81,7 @@ export default function AccessPage() {
         const otpCode = generateOTP()
         setGeneratedOtp(otpCode)
 
-        // Sauvegarder le code OTP dans Supabase
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000) // Expire dans 10 minutes
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
         
         await supabase.from('otp_codes').insert({
           code: otpCode,
@@ -83,14 +90,13 @@ export default function AccessPage() {
           used: false
         })
 
-        // Envoyer l'email OTP (ou afficher la popup en mode simulation)
         setPopup({ message: 'Génération du code...', type: 'info' })
         const emailSent = await sendOTPEmail(cleanEmail, otpCode)
 
         if (emailSent) {
-          // Sauvegarder les infos en localStorage
           localStorage.setItem('user_email', cleanEmail)
           localStorage.setItem('user_phone', cleanPhone)
+          localStorage.setItem('user_city', cleanCity) // ← NOUVEAU
           if (!isReturningUser && name.trim()) {
             localStorage.setItem('user_name', name.trim())
           }
@@ -101,9 +107,10 @@ export default function AccessPage() {
           setPopup({ message: 'Erreur lors de la génération du code. Veuillez réessayer.', type: 'error' })
         }
       } else {
-        // Utilisateur n'a pas payé → Rediriger vers la page de paiement
+        // Utilisateur n'a pas payé → Rediriger vers paiement
         localStorage.setItem('user_email', cleanEmail)
         localStorage.setItem('user_phone', cleanPhone)
+        localStorage.setItem('user_city', cleanCity) // ← NOUVEAU
         if (!isReturningUser && name.trim()) {
           localStorage.setItem('user_name', name.trim())
         }
@@ -132,7 +139,6 @@ export default function AccessPage() {
     try {
       const cleanEmail = email.trim().toLowerCase()
 
-      // Vérifier le code dans Supabase
       const { data: otpData, error: otpError } = await supabase
         .from('otp_codes')
         .select('*')
@@ -149,13 +155,11 @@ export default function AccessPage() {
         return
       }
 
-      // Marquer le code comme utilisé
       await supabase
         .from('otp_codes')
         .update({ used: true, used_at: new Date().toISOString() })
         .eq('id', otpData[0].id)
 
-      // Générer un token d'accès
       const accessToken = Math.random().toString(36).substring(2, 15) + 
                          Math.random().toString(36).substring(2, 15)
 
@@ -172,7 +176,7 @@ export default function AccessPage() {
     }
   }
 
-   const handleBack = () => {
+  const handleBack = () => {
     navigate('/')
   }
 
@@ -180,7 +184,6 @@ export default function AccessPage() {
     <div style={styles.container}>
       {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
 
-      {/* Popup OTP personnalisée */}
       {showOTPPopup && (
         <OTPPopup 
           code={otpCode} 
@@ -196,7 +199,10 @@ export default function AccessPage() {
 
       <div style={styles.content}>
         <div style={styles.card}>
-          <h1 style={styles.title}>📚 DigiLib</h1>
+          <div className="flex justify-center items-center gap-5 mb-4">
+            <img src={Logo} alt="DigiLib Logo" style={{ maxWidth: '100px' }} />
+                      <h1 style={styles.title}> DigiLib</h1>
+          </div>
           <p style={styles.subtitle}>
             {step === 'info' 
               ? 'Accédez à votre bibliothèque' 
@@ -206,19 +212,30 @@ export default function AccessPage() {
           {step === 'info' ? (
             <form onSubmit={handleSubmitInfo} style={styles.form}>
               {!isReturningUser && (
-                <input
-                  type="text"
-                  placeholder="Votre nom complet"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  style={styles.input}
-                  required
-                />
+                <>
+                  <input
+                    type="text"
+                    placeholder="Votre nom complet *"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    style={styles.input}
+                    required
+                  />
+
+                  <input
+                    type="text"
+                    placeholder="Votre ville *"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    style={styles.input}
+                    required
+                  />
+                </>
               )}
 
               <input
                 type="email"
-                placeholder="Votre email"
+                placeholder="Votre email *"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={styles.input}
@@ -228,7 +245,7 @@ export default function AccessPage() {
 
               <input
                 type="tel"
-                placeholder="Votre numéro de téléphone"
+                placeholder="Votre numéro de téléphone *"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 style={styles.input}
@@ -243,9 +260,9 @@ export default function AccessPage() {
                 {loading ? 'Vérification...' : 'Continuer →'}
               </button>
 
-                        <button onClick={handleBack} style={styles.backButton}>
-          Retour à l'accueil
-        </button>
+              <button onClick={handleBack} style={styles.backButton}>
+                Retour à l'accueil
+              </button>
 
               {isReturningUser && (
                 <p style={styles.info}>
@@ -292,7 +309,6 @@ export default function AccessPage() {
               <button
                 type="button"
                 onClick={() => {
-                  // Réafficher la popup si nécessaire
                   if (otpCode) {
                     setShowOTPPopup(true)
                   }
@@ -331,7 +347,7 @@ const styles = {
     objectFit: 'cover' as const,
     zIndex: 0,
   },
-    backButton: {
+  backButton: {
     width: '100%',
     background: 'transparent',
     color: '#10b981',

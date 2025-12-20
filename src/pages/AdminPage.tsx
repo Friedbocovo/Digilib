@@ -3,20 +3,20 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
 import { Book, LucideIcon } from 'lucide-react'
-import { 
-  Settings, 
-  LogOut, 
-  Users, 
-  DollarSign, 
-  CheckCircle, 
-  Clock, 
-  CreditCard, 
-  FolderOpen, 
-  BookOpen, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Eye, 
+import {
+  Settings,
+  LogOut,
+  Users,
+  DollarSign,
+  CheckCircle,
+  Clock,
+  CreditCard,
+  FolderOpen,
+  BookOpen,
+  Plus,
+  Edit2,
+  Trash2,
+  Eye,
   Download,
   Phone,
   Mail,
@@ -70,6 +70,7 @@ interface User {
   name: string
   email: string
   phone_number: string
+  city?: string
   created_at: string
 }
 
@@ -82,18 +83,18 @@ const getLucideIcon = (iconName: string, size = 20, color = 'white') => {
   if (IconComponent) {
     return <IconComponent size={size} color={color} />
   }
-  return <Book size={size} color={color} /> 
+  return <Book size={size} color={color} />
 }
 
 const getDirectImageUrl = (url: string): string => {
   if (!url) return 'https://via.placeholder.com/150x200/667eea/ffffff?text=Livre'
-  
+
   if (url.includes('drive.google.com/uc?export=view&id=')) {
     return url
   }
-  
+
   let fileId = ''
-  
+
   if (url.includes('/file/d/')) {
     const match = url.match(/\/file\/d\/([^\/]+)/)
     if (match) fileId = match[1]
@@ -103,11 +104,11 @@ const getDirectImageUrl = (url: string): string => {
   } else if (url.length > 20 && !url.includes('/')) {
     fileId = url
   }
-  
+
   if (fileId) {
     return `https://drive.google.com/uc?export=view&id=${fileId}`
   }
-  
+
   return url || 'https://via.placeholder.com/150x200/667eea/ffffff?text=Livre'
 }
 
@@ -397,7 +398,7 @@ export default function AdminPage() {
       <header style={styles.header}>
         <h1 style={styles.logo}>
           <Settings size={28} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-         <span className="md:flex hidden "> Admin Dashboard</span> <span className="md:hidden flex text-2xl  "> Admin D...</span>
+          <span className="md:flex hidden "> Admin Dashboard</span> <span className="md:hidden flex text-2xl  "> Admin D...</span>
 
         </h1>
         <button onClick={handleLogout} style={styles.logoutButton}>
@@ -474,7 +475,7 @@ export default function AdminPage() {
               {activeTab === 'payments' && (
                 <div>
                   <h2 style={styles.sectionTitle}>Liste des paiements</h2>
-                  
+
                   {payments.length === 0 ? (
                     <p style={styles.emptyMessage}>Aucun paiement pour le moment</p>
                   ) : (
@@ -486,6 +487,7 @@ export default function AdminPage() {
                             <th style={styles.th}>Nom</th>
                             <th style={styles.th}>Email</th>
                             <th style={styles.th}>Téléphone</th>
+                            <th style={styles.th}>Ville</th>
                             <th style={styles.th}>Montant</th>
                             <th style={styles.th}>Méthode</th>
                             <th style={styles.th}>Statut</th>
@@ -510,6 +512,9 @@ export default function AdminPage() {
                                 <Phone size={14} style={{ marginRight: '0.5rem', verticalAlign: 'middle', color: '#999' }} />
                                 {payment.phone_number}
                               </td>
+                              <td style={styles.td}>  {/* ← NOUVEAU */}
+                                {payment.users?.city || payment.city || 'Non renseignée'}
+                              </td>
                               <td style={styles.td}>
                                 <strong>{formatAmount(payment.amount)}</strong>
                               </td>
@@ -521,17 +526,17 @@ export default function AdminPage() {
                               <td style={styles.td}>
                                 <span style={{
                                   ...styles.statusBadge,
-                                  ...(payment.status === 'completed' 
-                                    ? styles.statusCompleted 
+                                  ...(payment.status === 'completed'
+                                    ? styles.statusCompleted
                                     : payment.status === 'pending'
-                                    ? styles.statusPending
-                                    : styles.statusFailed)
+                                      ? styles.statusPending
+                                      : styles.statusFailed)
                                 }}>
                                   {payment.status === 'completed' && <CheckCircle size={14} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />}
                                   {payment.status === 'pending' && <Clock size={14} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />}
                                   {payment.status === 'completed' ? 'Réussi' :
-                                   payment.status === 'pending' ? 'En attente' :
-                                   'Échoué'}
+                                    payment.status === 'pending' ? 'En attente' :
+                                      'Échoué'}
                                 </span>
                               </td>
                               <td style={styles.td}>
@@ -549,7 +554,7 @@ export default function AdminPage() {
                   <h2 style={{ ...styles.sectionTitle, marginTop: '3rem' }}>
                     Utilisateurs inscrits ({users.length})
                   </h2>
-                  
+
                   {users.length === 0 ? (
                     <p style={styles.emptyMessage}>Aucun utilisateur inscrit</p>
                   ) : (
@@ -568,6 +573,9 @@ export default function AdminPage() {
                             <p style={styles.userPhone}>
                               <Phone size={14} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />
                               {user.phone_number}
+                            </p>
+                            <p style={styles.userCity}>  {/* ← NOUVEAU */}
+                              {user.city || 'Ville non renseignée'}
                             </p>
                             <p style={styles.userDate}>
                               <Calendar size={14} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />
@@ -1134,6 +1142,13 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
   },
+  userCity: {
+  margin: '0.25rem 0',
+  fontSize: '0.9rem',
+  color: '#666',
+  display: 'flex',
+  alignItems: 'center',
+},
   userDate: {
     margin: '0.5rem 0 0 0',
     fontSize: '0.85rem',

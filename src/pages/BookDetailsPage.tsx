@@ -25,6 +25,7 @@ interface Book {
   published_year?: number
   downloads: number
   views: number
+  category_id?: string
   categories?: {
     name: string
     color: string
@@ -140,6 +141,24 @@ export default function BookDetailsPage() {
     }
   }
 
+  // ✅ CORRECTION : Retourner à la liste des livres de la catégorie
+  const handleBack = () => {
+    const savedCategoryId = localStorage.getItem('selected_category_id')
+    
+    if (savedCategoryId && book?.category_id === savedCategoryId) {
+      // Si on vient de la même catégorie, retourner à la liste des livres
+      navigate('/library')
+    } else if (book?.category_id) {
+      // Si la catégorie sauvegardée ne correspond pas, mettre à jour et retourner
+      localStorage.setItem('selected_category_id', book.category_id)
+      navigate('/library')
+    } else {
+      // Par défaut, retourner aux catégories
+      localStorage.removeItem('selected_category_id')
+      navigate('/library')
+    }
+  }
+
   if (loading) {
     return (
       <div style={styles.loading}>
@@ -153,7 +172,7 @@ export default function BookDetailsPage() {
     return (
       <div style={styles.container}>
         <p style={styles.error}>Livre introuvable</p>
-        <button onClick={() => navigate('/library')} style={styles.backButton}>
+        <button onClick={handleBack} style={styles.backButton}>
           <ArrowLeft size={20} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
           Retour à la bibliothèque
         </button>
@@ -166,7 +185,7 @@ export default function BookDetailsPage() {
       {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
 
       <div style={styles.header}>
-        <button onClick={() => navigate('/library')} style={styles.backButton}>
+        <button onClick={handleBack} style={styles.backButton}>
           <ArrowLeft size={20} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
           Retour
         </button>

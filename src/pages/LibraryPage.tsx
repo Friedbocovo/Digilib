@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
 import Logo from './logo2.png'
@@ -39,6 +39,7 @@ interface Book {
 
 export default function LibraryPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [categories, setCategories] = useState<Category[]>([])
   const [books, setBooks] = useState<Book[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -51,6 +52,36 @@ export default function LibraryPage() {
     checkAccessAndLoadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ✅ Restaurer la catégorie sélectionnée depuis localStorage
+  useEffect(() => {
+    const savedCategoryId = localStorage.getItem('selected_category_id')
+    if (savedCategoryId) {
+      setSelectedCategory(savedCategoryId)
+    }
+  }, [])
+
+  // ✅ Gérer le bouton "Retour" du navigateur
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (selectedCategory) {
+        event.preventDefault()
+        setSelectedCategory(null)
+        setSearchQuery('')
+        localStorage.removeItem('selected_category_id') // ← NOUVEAU
+      }
+    }
+
+    if (selectedCategory) {
+      window.history.pushState({ categoryView: true }, '')
+    }
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [selectedCategory])
 
   const getCoverImageUrl = (coverUrl: string) => {
     if (!coverUrl) {
@@ -122,7 +153,6 @@ export default function LibraryPage() {
         return
       }
 
-      // Si pas de nom stocké, extraire du email
       if (!storedName && userEmail) {
         storedName = userEmail.split('@')[0]
         localStorage.setItem('user_name', storedName)
@@ -170,16 +200,29 @@ export default function LibraryPage() {
     localStorage.removeItem('library_access_token')
     localStorage.removeItem('user_email')
     localStorage.removeItem('user_name')
+    localStorage.removeItem('user_city')
+    localStorage.removeItem('selected_category_id') // ← NOUVEAU
     setPopup({ message: 'Déconnexion réussie !', type: 'success' })
     setTimeout(() => navigate('/'), 1000)
   }
 
   const handleCategoryClick = (categoryId: string) => {
     setSelectedCategory(categoryId)
+    // ✅ Sauvegarder la catégorie sélectionnée dans localStorage
+    localStorage.setItem('selected_category_id', categoryId)
   }
 
   const handleBookClick = (bookId: string) => {
+    // ✅ La catégorie est déjà sauvegardée, naviguer vers les détails
     navigate(`/book/${bookId}`)
+  }
+
+  const handleBackToCategories = () => {
+    setSelectedCategory(null)
+    setSearchQuery('')
+    // ✅ Supprimer la catégorie sauvegardée
+    localStorage.removeItem('selected_category_id')
+    window.history.back()
   }
 
   const filteredBooks = selectedCategory
@@ -205,7 +248,6 @@ export default function LibraryPage() {
         <header style={styles.header}>
           <h1 style={styles.logo}>
             <img src={Logo} alt="Logo" className="md:h-15 md:w-15 h-10 w-10" />
-
             DigiLib
           </h1>
           <button onClick={handleLogout} style={styles.logoutButton}>
@@ -258,7 +300,7 @@ export default function LibraryPage() {
             <>
               <div style={styles.breadcrumb}>
                 <button
-                  onClick={() => setSelectedCategory(null)}
+                  onClick={handleBackToCategories}
                   style={styles.backButton}
                 >
                   <ArrowLeft size={20} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
@@ -335,7 +377,7 @@ export default function LibraryPage() {
           )}
         </div>
 
-        <footer className='fixed flex justify-center items-center h-[100px] w-[50px] bg-red-500' >
+        <footer className=' flex justify-center items-center h-[100px]  bg-red-500' >
            <a
                             href="https://wa.me/22941822980?text=Bonjour%2C%20j'aimerais%20avoir%20acc%C3%A8s%20%C3%A0%20la%20biblioth%C3%A8que%20DigiLib"
                             target="_blank"
@@ -345,7 +387,7 @@ export default function LibraryPage() {
                             onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
                           >
                             <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem' }} className='flex items-center gap-2'>
-                              <MessageCircleMore size={20} strokeWidth={2} />Pous nous contacter cliquer ici
+                              <MessageCircleMore size={20} strokeWidth={2} />Pour nous contacter cliquer ici
                             </span>
                             </a>
         </footer>

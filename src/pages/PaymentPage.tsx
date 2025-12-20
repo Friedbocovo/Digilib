@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
 import { ArrowLeft, Mail, Phone, CreditCard, Check, Loader, User } from 'lucide-react'
+import Video from './vid_ebook2.mp4'
+
 
 // ⚠️ MODE SIMULATION 
 const SIMULATION_MODE = false
@@ -33,7 +35,7 @@ export default function PaymentPage() {
 
   const handleInfoSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!userName.trim()) {
       setPopup({ message: 'Veuillez entrer votre nom', type: 'error' })
       return
@@ -46,19 +48,19 @@ export default function PaymentPage() {
 
     // Validation du téléphone
     const cleanPhone = userPhone.replace(/\s/g, '').replace(/^\+/, '')
-    
+
     // En mode simulation, accepter n'importe quel numéro
     if (SIMULATION_MODE) {
       console.log('🎮 Mode simulation : validation ignorée')
       setStep('payment')
       return
     }
-    
+
     // Vérifier que c'est un numéro (pas de lettres)
     if (!/^[0-9]+$/.test(cleanPhone)) {
-      setPopup({ 
-        message: '❌ Le numéro ne doit contenir que des chiffres', 
-        type: 'error' 
+      setPopup({
+        message: '❌ Le numéro ne doit contenir que des chiffres',
+        type: 'error'
       })
       return
     }
@@ -67,11 +69,11 @@ export default function PaymentPage() {
     const isBenin8 = /^[0-9]{8}$/.test(cleanPhone)  // 8 chiffres
     const isBenin11 = /^229[0-9]{8}$/.test(cleanPhone)  // 229 + 8 chiffres
     const isInternational = cleanPhone.length >= 10 && cleanPhone.length <= 15 && !cleanPhone.startsWith('229')
-    
+
     if (!isBenin8 && !isBenin11 && !isInternational) {
-      setPopup({ 
-        message: '❌ Format de numéro invalide\n\nExemples valides:\n• 97234567 (8 chiffres)\n• 22997234567 (229 + 8 chiffres)\n• 33612345678 (international)', 
-        type: 'error' 
+      setPopup({
+        message: '❌ Format de numéro invalide\n\nExemples valides:\n• 97234567 (8 chiffres)\n• 22997234567 (229 + 8 chiffres)\n• 33612345678 (international)',
+        type: 'error'
       })
       return
     }
@@ -89,7 +91,7 @@ export default function PaymentPage() {
       console.log('📝 Enregistrement du paiement...')
 
       let userId = null
-      
+
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
@@ -113,12 +115,12 @@ export default function PaymentPage() {
           })
           .select('id')
           .maybeSingle()
-        
+
         if (createError && !SIMULATION_MODE) {
           console.error('❌ Erreur création utilisateur:', createError)
           throw createError
         }
-        
+
         userId = newUser?.id
       }
 
@@ -142,15 +144,15 @@ export default function PaymentPage() {
       localStorage.setItem('user_phone', cleanPhone)
       localStorage.removeItem('maketou_cart_id')
 
-      setPopup({ 
-        message: SIMULATION_MODE ? '🎮 Paiement simulé avec succès !' : '✅ Paiement réussi !', 
-        type: 'success' 
+      setPopup({
+        message: SIMULATION_MODE ? ' Paiement simulé avec succès !' : '✅ Paiement réussi !',
+        type: 'success'
       })
-      
+
       setTimeout(() => navigate('/library'), 1500)
     } catch (error: any) {
       console.error('❌ Erreur:', error)
-      
+
       if (SIMULATION_MODE) {
         console.log('⚠️ Mode simulation : erreur ignorée')
         const accessToken = generateAccessToken()
@@ -158,7 +160,7 @@ export default function PaymentPage() {
         localStorage.setItem('user_email', userEmail.trim().toLowerCase())
         localStorage.setItem('user_name', userName.trim())
         localStorage.setItem('user_phone', userPhone.trim())
-        
+
         setPopup({ message: '🎮 Simulation réussie !', type: 'success' })
         setTimeout(() => navigate('/library'), 1500)
       } else {
@@ -177,9 +179,9 @@ export default function PaymentPage() {
     setLoading(true)
 
     if (SIMULATION_MODE) {
-      console.log('🎮 MODE SIMULATION ACTIVÉ')
-      setPopup({ message: '🎮 Simulation de paiement...', type: 'info' })
-      
+      console.log(' MODE SIMULATION ACTIVÉ')
+      setPopup({ message: ' Simulation de paiement...', type: 'info' })
+
       setTimeout(async () => {
         await handlePaymentSuccess(`SIM-${Date.now()}`)
       }, 2000)
@@ -216,9 +218,9 @@ export default function PaymentPage() {
         }
       }
 
-      console.log('📦 Création du panier Maketou...')
-      console.log('📞 Numéro formaté:', formattedPhone)
-      console.log('📧 Email:', cleanEmail)
+      console.log('Création du panier Maketou...')
+      console.log('Numéro formaté:', formattedPhone)
+      console.log('Email:', cleanEmail)
 
       const payload = {
         productDocumentId: MAKETOU_PRODUCT_ID,
@@ -226,14 +228,14 @@ export default function PaymentPage() {
         firstName: firstName,
         lastName: lastName,
         phone: formattedPhone,
-        redirectURL: `${window.location.origin}/library`,  // ← TOUJOURS envoyé
+        redirectURL: `${window.location.origin}/library`,  // URL de redirection après paiement
         meta: {
           source: 'digilib-website',
           userName: cleanName
         }
       }
 
-      console.log('📤 Payload:', JSON.stringify(payload, null, 2))
+      console.log('Payload:', JSON.stringify(payload, null, 2))
 
       const response = await fetch('https://api.maketou.net/api/v1/stores/cart/checkout', {
         method: 'POST',
@@ -245,13 +247,13 @@ export default function PaymentPage() {
       })
 
       const data = await response.json()
-      console.log('📥 Réponse Maketou:', data)
-      console.log('📊 Status HTTP:', response.status)
+      console.log('Réponse Maketou:', data)
+      console.log('Status HTTP:', response.status)
 
       // Vérifier si le panier est créé (même sans redirectUrl)
       if (response.ok && data.cart) {
         console.log('✅ Panier Maketou créé:', data.cart.id)
-        
+
         localStorage.setItem('maketou_cart_id', data.cart.id)
         localStorage.setItem('user_name', cleanName)
         localStorage.setItem('user_email', cleanEmail)
@@ -265,12 +267,12 @@ export default function PaymentPage() {
           // Pas de redirectUrl mais panier créé = considérer comme succès
           console.log('⚠️ Panier créé mais pas de redirectUrl')
           console.log('💡 Simulation du succès...')
-          
-          setPopup({ 
-            message: '✅ Panier créé ! Redirection vers la bibliothèque...', 
-            type: 'success' 
+
+          setPopup({
+            message: 'Redirection vers la bibliothèque...',
+            type: 'success'
           })
-          
+
           setTimeout(async () => {
             await handlePaymentSuccess(data.cart.id)
           }, 1500)
@@ -278,7 +280,9 @@ export default function PaymentPage() {
       } else {
         // Erreur de création du panier
         let errorMessage = 'Erreur lors de la création du panier'
-        
+        let errorMessage2 = 'Verifier le format de votre numéro de téléphone et réessayez. Nous acceptons les numéros Béninois  (8 chiffres sans 01) et internationaux (10 à 15 chiffres).'
+
+
         if (data.message) {
           if (Array.isArray(data.message)) {
             errorMessage = data.message.map(msg => {
@@ -292,17 +296,17 @@ export default function PaymentPage() {
             errorMessage = JSON.stringify(data.message)
           }
         }
-        
+
         console.error('❌ Erreur Maketou:', { status: response.status, data })
-        setPopup({ message: `❌ ${errorMessage}`, type: 'error' })
+        setPopup({ message: `❌ ${errorMessage2}`, type: 'error' })
         setLoading(false)
       }
-      
+
     } catch (error: any) {
       console.error('❌ Erreur réseau:', error)
-      setPopup({ 
-        message: '❌ Erreur de connexion. Vérifiez votre internet et réessayez.', 
-        type: 'error' 
+      setPopup({
+        message: '❌ Erreur de connexion. Vérifiez votre internet et réessayez.',
+        type: 'error'
       })
       setLoading(false)
     }
@@ -318,35 +322,32 @@ export default function PaymentPage() {
         />
       )}
 
+      <video autoPlay loop muted playsInline style={styles.video}>
+        <source src={Video} type="video/mp4" />
+      </video>
+
       {SIMULATION_MODE && (
         <div style={styles.simulationBadge}>
-          🎮 MODE SIMULATION
+          MODE SIMULATION
         </div>
       )}
 
-      <button onClick={() => navigate('/')} style={styles.backButton}>
-        <ArrowLeft size={20} />
-        <span>Retour</span>
-      </button>
 
-      <div style={styles.card}>
+
+      <div style={styles.card} className='bg-white'>
+        <span className='flex text-blue-500 gap-2 font-bold cursor-pointer items-center' onClick={() => navigate('/')}> <ArrowLeft size={20} />Retour</span>
         <h1 style={styles.title}>Accès à la Bibliothèque</h1>
         <p style={styles.subtitle}>Un seul paiement. Accès à vie.</p>
 
         <div style={styles.priceBox}>
           <div style={styles.priceLabel}>Prix unique</div>
           <div style={styles.priceAmount}>{LIBRARY_ACCESS_PRICE} FCFA</div>
-          <div style={styles.priceFeatures}>
-            ✅ Accès illimité à vie<br />
-            ✅ Téléchargements gratuits<br />
-            ✅ Tous les genres disponibles
-          </div>
         </div>
 
         {step === 'info' && (
           <form onSubmit={handleInfoSubmit} style={styles.form}>
             <h2 style={styles.stepTitle}>Vos informations</h2>
-            
+
             <div style={styles.inputGroup}>
               <label style={styles.label}>
                 <User size={18} />
@@ -380,19 +381,16 @@ export default function PaymentPage() {
             <div style={styles.inputGroup}>
               <label style={styles.label}>
                 <Phone size={18} />
-                <span>Numéro de téléphone (min. 8 chiffres)</span>
+                <span>Numéro de téléphone</span>
               </label>
               <input
                 type="tel"
-                placeholder="Ex: 01234567 ou 22901234567"
+                placeholder="Ex: 97989990"
                 value={userPhone}
                 onChange={(e) => setUserPhone(e.target.value)}
                 style={styles.input}
                 required
               />
-              <div style={styles.helpText}>
-                📱 Formats acceptés: 01234567, 22901234567, +33612345678
-              </div>
             </div>
 
             <button type="submit" style={styles.submitButton}>
@@ -404,23 +402,17 @@ export default function PaymentPage() {
         {step === 'payment' && (
           <div style={styles.paymentSection}>
             <h2 style={styles.stepTitle}>Paiement Mobile Money</h2>
-            
+
             <div style={styles.infoCard}>
               <p><strong>Nom:</strong> {userName}</p>
               <p><strong>Email:</strong> {userEmail}</p>
               <p><strong>Téléphone:</strong> {userPhone}</p>
             </div>
 
-            <div style={styles.paymentInfo}>
-              <CreditCard size={32} />
-              <p>Vous allez être redirigé vers la page de paiement Maketou</p>
-              <p style={styles.operators}>Accepte: MTN, Moov, Celtiis</p>
-            </div>
-
             <button
               onClick={handleMaketouPayment}
               disabled={loading}
-              style={loading ? {...styles.payButton, ...styles.payButtonDisabled} : styles.payButton}
+              style={loading ? { ...styles.payButton, ...styles.payButtonDisabled } : styles.payButton}
             >
               {loading ? (
                 <>
@@ -446,14 +438,26 @@ export default function PaymentPage() {
 }
 
 const styles = {
+
   container: {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     display: 'flex',
     alignItems: 'center',
+    overflow: 'hidden',
     justifyContent: 'center',
     padding: '2rem',
     position: 'relative' as const,
+    zIndex: 1,  // ← AJOUTER pour s'assurer que tout le contenu est au-dessus
+  },
+  video: {
+    position: 'fixed' as const,
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    pointerEvents: 'none' as const,
+    objectFit: 'cover' as const,
+    zIndex: 0,
   },
   simulationBadge: {
     position: 'fixed' as const,
@@ -483,12 +487,13 @@ const styles = {
     backdropFilter: 'blur(10px)',
   },
   card: {
-    background: 'white',
     borderRadius: '20px',
     padding: '2.5rem',
     maxWidth: '500px',
     width: '100%',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+    position: 'relative' as const,  // ← AJOUTER
+    zIndex: 10,                      // ← AJOUTER
   },
   title: {
     fontSize: '2rem',
