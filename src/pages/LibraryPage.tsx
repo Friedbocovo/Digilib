@@ -256,7 +256,7 @@ export default function LibraryPage() {
           </button>
         </header>
 
-        <div style={styles.content}>
+        <div style={styles.content} className='mb-20 '>
           {!selectedCategory ? (
             // VUE CATÉGORIES
             <>
@@ -377,7 +377,7 @@ export default function LibraryPage() {
           )}
         </div>
 
-        <footer className=' flex justify-center items-center h-[100px]  bg-red-500' >
+        <footer className=' flex justify-center items-center h-[30px]  bg-black pt-1 fixed bottom-0 mt-10 left-0 right-0 ' >
            <a
                             href="https://wa.me/22941822980?text=Bonjour%2C%20j'aimerais%20avoir%20acc%C3%A8s%20%C3%A0%20la%20biblioth%C3%A8que%20DigiLib"
                             target="_blank"
@@ -448,6 +448,7 @@ const styles = {
   content: {
     maxWidth: '1400px',
     margin: '0 auto',
+    marginBottom: '1.5rem',
     padding: 'clamp(1rem, 3vw, 2rem)',
   },
   welcomeSection: {
