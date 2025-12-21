@@ -5,6 +5,8 @@ import { sendOTPEmail, registerOTPPopupCallback } from '../services/emailService
 import { OTPPopup } from '../components/OTPPopup'
 import { Popup } from '../components/Popup'
 import Video from './vid_ebook2.mp4'
+import Logo from "./logo2.png"
+
 
 export default function AccessPage() {
   const navigate = useNavigate()
@@ -12,13 +14,13 @@ export default function AccessPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  const [city, setCity] = useState('')
+  const [city, setCity] = useState('') // ← NOUVEAU
   const [otp, setOtp] = useState('')
   const [generatedOtp, setGeneratedOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [isReturningUser, setIsReturningUser] = useState(false)
   const [popup, setPopup] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
-  
+
   const [showOTPPopup, setShowOTPPopup] = useState(false)
   const [otpCode, setOTPCode] = useState('')
 
@@ -52,6 +54,7 @@ export default function AccessPage() {
       return
     }
 
+    // Validation de la ville (optionnelle mais recommandée)
     if (!isReturningUser && city.trim().length < 2) {
       setPopup({ message: 'Veuillez entrer une ville valide', type: 'error' })
       return
@@ -64,113 +67,60 @@ export default function AccessPage() {
       const cleanPhone = phone.trim()
       const cleanCity = city.trim()
 
-      console.log('🔍 Vérification du paiement pour:', cleanEmail, cleanPhone)
+      // Vérifier si l'utilisateur a déjà payé
+      const { data: paymentData } = await supabase
+        .from('payments')
+        .select('*')
+        .ilike('user_email', cleanEmail)
+        .eq('phone_number', cleanPhone)
+        .eq('status', 'completed')
+        .limit(1)
 
-      // ✅ CORRECTION : Vérification améliorée avec gestion d'erreurs
-      let paymentData = null
-      let paymentError = null
+      if (paymentData && paymentData.length > 0) {
+        // Utilisateur a déjà payé → Générer et envoyer OTP
+        const otpCode = generateOTP()
+        setGeneratedOtp(otpCode)
 
-      try {
-        const result = await supabase
-          .from('payments')
-          .select('*')
-          .ilike('user_email', cleanEmail)
-          .eq('phone_number', cleanPhone)
-          .eq('status', 'completed')
-          .limit(1)
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
 
-        paymentData = result.data
-        paymentError = result.error
-
-        console.log('📊 Résultat Supabase:', {
-          success: !paymentError,
-          dataLength: paymentData?.length || 0,
-          error: paymentError
+        await supabase.from('otp_codes').insert({
+          code: otpCode,
+          email: cleanEmail,
+          expires_at: expiresAt.toISOString(),
+          used: false
         })
 
-      } catch (supabaseError) {
-        console.error('❌ Erreur Supabase:', supabaseError)
-        // Continuer vers le paiement même en cas d'erreur Supabase
-        paymentError = supabaseError
-      }
+        setPopup({ message: 'Génération du code...', type: 'info' })
+        const emailSent = await sendOTPEmail(cleanEmail, otpCode)
 
-      // ✅ Si erreur Supabase ou aucun paiement trouvé → Rediriger vers paiement
-      if (paymentError || !paymentData || paymentData.length === 0) {
-        console.log('💳 Aucun paiement trouvé, redirection vers /payment')
-        
-        // Sauvegarder les informations
-        localStorage.setItem('user_email', cleanEmail)
-        localStorage.setItem('user_phone', cleanPhone)
-        localStorage.setItem('user_city', cleanCity)
-        if (!isReturningUser && name.trim()) {
-          localStorage.setItem('user_name', name.trim())
+        if (emailSent) {
+          localStorage.setItem('user_email', cleanEmail)
+          localStorage.setItem('user_phone', cleanPhone)
+          localStorage.setItem('user_city', cleanCity) // ← NOUVEAU
+          if (!isReturningUser && name.trim()) {
+            localStorage.setItem('user_name', name.trim())
+          }
+
+          setPopup({ message: 'Code copié avec succès !', type: 'success' })
+          setStep('otp')
+        } else {
+          setPopup({ message: 'Erreur lors de la génération du code. Veuillez réessayer.', type: 'error' })
         }
-
-        setPopup({ message: 'Redirection vers le paiement...', type: 'info' })
-        
-        // ✅ CORRECTION : Utiliser window.location pour forcer la redirection
-        setTimeout(() => {
-          console.log('🔀 Redirection forcée vers /payment')
-          window.location.href = '/payment'
-        }, 1000)
-        
-        return
-      }
-
-      // ✅ Si paiement trouvé → Générer OTP
-      console.log('✅ Paiement trouvé, génération OTP')
-      
-      const otpCode = generateOTP()
-      setGeneratedOtp(otpCode)
-
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
-      
-      await supabase.from('otp_codes').insert({
-        code: otpCode,
-        email: cleanEmail,
-        expires_at: expiresAt.toISOString(),
-        used: false
-      })
-
-      setPopup({ message: 'Génération du code...', type: 'info' })
-      const emailSent = await sendOTPEmail(cleanEmail, otpCode)
-
-      if (emailSent) {
-        localStorage.setItem('user_email', cleanEmail)
-        localStorage.setItem('user_phone', cleanPhone)
-        localStorage.setItem('user_city', cleanCity)
-        if (!isReturningUser && name.trim()) {
-          localStorage.setItem('user_name', name.trim())
-        }
-
-        setPopup({ message: 'Code généré ! Copiez-le depuis la popup', type: 'success' })
-        setStep('otp')
       } else {
-        setPopup({ message: 'Erreur lors de la génération du code. Veuillez réessayer.', type: 'error' })
-      }
+        // Utilisateur n'a pas payé → Rediriger vers paiement
+        localStorage.setItem('user_email', cleanEmail)
+        localStorage.setItem('user_phone', cleanPhone)
+        localStorage.setItem('user_city', cleanCity) // ← NOUVEAU
+        if (!isReturningUser && name.trim()) {
+          localStorage.setItem('user_name', name.trim())
+        }
 
+        setPopup({ message: 'Vous n\'avez pas encore payé. Redirection...', type: 'info' })
+        setTimeout(() => navigate('/payment'), 1500)
+      }
     } catch (error) {
-      console.error('❌ Erreur générale:', error)
-      
-      // ✅ En cas d'erreur, rediriger vers le paiement
-      const cleanEmail = email.trim().toLowerCase()
-      const cleanPhone = phone.trim()
-      const cleanCity = city.trim()
-      
-      localStorage.setItem('user_email', cleanEmail)
-      localStorage.setItem('user_phone', cleanPhone)
-      localStorage.setItem('user_city', cleanCity)
-      if (!isReturningUser && name.trim()) {
-        localStorage.setItem('user_name', name.trim())
-      }
-
-      setPopup({ message: 'Erreur de vérification. Redirection vers le paiement...', type: 'info' })
-      
-      setTimeout(() => {
-        console.log('🔀 Redirection forcée vers /payment (erreur)')
-        window.location.href = '/payment'
-      }, 1500)
-      
+      console.error('Erreur:', error)
+      setPopup({ message: 'Une erreur est survenue', type: 'error' })
     } finally {
       setLoading(false)
     }
@@ -200,7 +150,7 @@ export default function AccessPage() {
         .limit(1)
 
       if (otpError || !otpData || otpData.length === 0) {
-        setPopup({ message: 'Code invalide ou expiré', type: 'error' })
+        setPopup({ message: 'Code invalide ou expiré ou encore vérifiez votre connexion', type: 'error' })
         setLoading(false)
         return
       }
@@ -210,12 +160,12 @@ export default function AccessPage() {
         .update({ used: true, used_at: new Date().toISOString() })
         .eq('id', otpData[0].id)
 
-      const accessToken = Math.random().toString(36).substring(2, 15) + 
-                         Math.random().toString(36).substring(2, 15)
+      const accessToken = Math.random().toString(36).substring(2, 15) +
+        Math.random().toString(36).substring(2, 15)
 
       localStorage.setItem('library_access_token', accessToken)
 
-      setPopup({ message: 'Accès autorisé ! Redirection...', type: 'success' })
+      setPopup({ message: 'Vous avez accès à la bibliothèque ! Redirection...', type: 'success' })
       setTimeout(() => navigate('/library'), 1500)
 
     } catch (error) {
@@ -235,9 +185,9 @@ export default function AccessPage() {
       {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
 
       {showOTPPopup && (
-        <OTPPopup 
-          code={otpCode} 
-          onClose={() => setShowOTPPopup(false)} 
+        <OTPPopup
+          code={otpCode}
+          onClose={() => setShowOTPPopup(false)}
         />
       )}
 
@@ -249,10 +199,13 @@ export default function AccessPage() {
 
       <div style={styles.content}>
         <div style={styles.card}>
-          <h1 style={styles.title}>📚 DigiLib</h1>
+          <div className='flex justify-center items-center md:mb-3 gap-3'>
+            <img src={Logo} alt="Logo" className="md:h-15 md:w-15 h-12 w-12 mb-0 " />
+            <h1 style={styles.title}> DigiLib</h1>
+          </div>
           <p style={styles.subtitle}>
-            {step === 'info' 
-              ? 'Accédez à votre bibliothèque' 
+            {step === 'info'
+              ? 'Accédez à votre bibliothèque'
               : 'Entrez le code de vérification'}
           </p>
 
@@ -299,8 +252,8 @@ export default function AccessPage() {
                 required
               />
 
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 style={styles.button}
                 disabled={loading}
               >
@@ -313,7 +266,7 @@ export default function AccessPage() {
 
               {isReturningUser && (
                 <p style={styles.info}>
-                  Pas vous ? <button 
+                  Pas vous ? <button
                     type="button"
                     onClick={() => {
                       setIsReturningUser(false)
@@ -331,7 +284,7 @@ export default function AccessPage() {
             <form onSubmit={handleVerifyOTP} style={styles.form}>
               <p style={styles.otpInfo}>
                 Un code à 6 chiffres a été généré.<br />
-                <strong>Copiez-le depuis la popup ci-dessus</strong>
+                <strong>Copiez-le et collez-le ici ⬇️ </strong>
               </p>
 
               <input
@@ -345,12 +298,12 @@ export default function AccessPage() {
                 autoFocus
               />
 
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 style={styles.button}
                 disabled={loading || otp.length !== 6}
               >
-                {loading ? 'Vérification...' : 'Vérifier le code'}
+                {loading ? 'Vérification...' : 'Je ne suis pas un robot'}
               </button>
 
               <button

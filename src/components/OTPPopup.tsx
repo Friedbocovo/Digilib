@@ -26,7 +26,7 @@ export function OTPPopup({ code, onClose }: OTPPopupProps) {
           <div style={styles.iconWrapper}>
             <span className="font-bold">CODE OTP</span> 
           </div>
-          <p style={styles.subtitle}>Code OTP généré avec succès !</p>
+          <p style={styles.subtitle}>Prouvez nous que vous n'êtes pas un robot</p>
         </div>
 
         <div style={styles.codeSection}>
