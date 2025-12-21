@@ -108,10 +108,10 @@ export default function AccessPage() {
 
         setPopup({ message: 'Redirection vers le paiement...', type: 'info' })
         
-        // ✅ CORRECTION : Attendre 1 seconde avant de rediriger
+        // ✅ CORRECTION : Utiliser window.location pour forcer la redirection
         setTimeout(() => {
-          console.log('🔀 Navigation vers /payment')
-          navigate('/payment')
+          console.log('🔀 Redirection forcée vers /payment')
+          window.location.href = '/payment'
         }, 1000)
         
         return
@@ -167,7 +167,8 @@ export default function AccessPage() {
       setPopup({ message: 'Erreur de vérification. Redirection vers le paiement...', type: 'info' })
       
       setTimeout(() => {
-        navigate('/payment')
+        console.log('🔀 Redirection forcée vers /payment (erreur)')
+        window.location.href = '/payment'
       }, 1500)
       
     } finally {

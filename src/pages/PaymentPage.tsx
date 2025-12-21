@@ -5,7 +5,7 @@ import { Popup } from '../components/Popup'
 import { ArrowLeft, Mail, Phone, CreditCard, Check, Loader, User } from 'lucide-react'
 
 // ⚠️ MODE SIMULATION 
-const SIMULATION_MODE = false
+const SIMULATION_MODE = true
 
 const MAKETOU_API_KEY = import.meta.env.VITE_MAKETOU_API_KEY
 const MAKETOU_PRODUCT_ID = import.meta.env.VITE_MAKETOU_PRODUCT_ID
