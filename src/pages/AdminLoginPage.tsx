@@ -155,6 +155,7 @@ const styles = {
     opacity: 0.6,
     cursor: 'not-allowed',
   },
+  
   backButton: {
     width: '100%',
     background: 'transparent',
