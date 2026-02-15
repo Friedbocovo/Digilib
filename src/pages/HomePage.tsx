@@ -307,7 +307,7 @@ export default function HomePage() {
                   <span>flybrary4@gmail.com</span>
                 </a>
                 <a
-                  href="https://wa.me/22941822980?text=Bonjour%2C%20j'aimerais%20avoir%20acc%C3%A8s%20%C3%A0%20la%20biblioth%C3%A8que%20DigiLib"
+                  href="https://wa.me/22947809413?text=Bonjour%2C%20j'aimerais%20avoir%20acc%C3%A8s%20%C3%A0%20la%20biblioth%C3%A8que%20DigiLib"
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ ...styles.contactLink, cursor: 'pointer' }}
