@@ -18,7 +18,7 @@ const SIMULATION_MODE = false
 
 const MAKETOU_API_KEY = import.meta.env.VITE_MAKETOU_API_KEY || ''
 const MAKETOU_PRODUCT_ID = import.meta.env.VITE_MAKETOU_PRODUCT_ID || ''
-const LIBRARY_ACCESS_PRICE = 5000
+const LIBRARY_ACCESS_PRICE = 2000
 
 export default function PaymentPage() {
   const navigate = useNavigate()

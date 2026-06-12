@@ -21,7 +21,7 @@ interface FAQ {
 const faqs: FAQ[] = [
   {
     question: "Comment ça marche ?",
-    answer: "C'est simple ! Payez une seule fois 5000 XAF via Mobile Money (MTN, Moov ou Celtiis), et accédez à vie à notre bibliothèque complète de milliers de livres. Vous pouvez lire en ligne ou télécharger gratuitement tous les livres que vous voulez."
+    answer: "C'est simple ! Payez une seule fois 2000 XAF via Mobile Money (MTN, Moov ou Celtiis), et accédez à vie à notre bibliothèque complète de milliers de livres. Vous pouvez lire en ligne ou télécharger gratuitement tous les livres que vous voulez."
   },
   {
     question: "Quels sont les modes de paiement ?",
@@ -29,7 +29,7 @@ const faqs: FAQ[] = [
   },
   {
     question: "Est-ce vraiment un accès à vie ?",
-    answer: "Oui, absolument ! Un seul paiement de 5000 FCFA vous donne un accès illimité et permanent à toute notre bibliothèque. Pas d'abonnement mensuel, pas de frais cachés. Vous payez une fois et c'est pour toujours."
+    answer: "Oui, absolument ! Un seul paiement de 2000 FCFA vous donne un accès illimité et permanent à toute notre bibliothèque. Pas d'abonnement mensuel, pas de frais cachés. Vous payez une fois et c'est pour toujours."
   },
   {
     question: "Puis-je télécharger les livres ?",
