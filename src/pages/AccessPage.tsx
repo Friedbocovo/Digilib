@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import jsQR from 'jsqr'
 import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
-import Video from './vid_ebook2.mp4'
-import Logo from "./logo2.png"
+import { AuthCardLayout } from '../components/AuthCardLayout'
+import { decodeCardPayload } from '../lib/memberCard'
+import { Link } from 'react-router-dom'
+import { QrCode, Upload } from 'lucide-react'
 
 export default function AccessPage() {
   const navigate = useNavigate()
@@ -14,6 +17,9 @@ export default function AccessPage() {
   const [loading, setLoading] = useState(false)
   const [isReturningUser, setIsReturningUser] = useState(false)
   const [popup, setPopup] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  const [mode, setMode] = useState<'form' | 'card'>('form')
+  const [cardLoading, setCardLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     // Vérifier si l'utilisateur a déjà un token d'accès
@@ -31,6 +37,12 @@ export default function AccessPage() {
       
       const storedPhone = localStorage.getItem('user_phone')
       if (storedPhone) setPhone(storedPhone)
+
+      const storedCity = localStorage.getItem('user_city')
+      if (storedCity) setCity(storedCity)
+
+      const storedName = localStorage.getItem('user_name')
+      if (storedName) setName(storedName)
     }
   }, [navigate])
 
@@ -176,29 +188,143 @@ export default function AccessPage() {
     }
   }
 
-  const handleBack = () => {
-    navigate('/')
+  const grantAccess = (accessEmail: string, accessPhone: string, accessName?: string, accessCity?: string) => {
+    const accessToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+    localStorage.setItem('library_access_token', accessToken)
+    localStorage.setItem('user_email', accessEmail)
+    localStorage.setItem('user_phone', accessPhone)
+    if (accessCity) localStorage.setItem('user_city', accessCity)
+    if (accessName) localStorage.setItem('user_name', accessName)
+    setPopup({ message: '✅ Accès autorisé ! Redirection...', type: 'success' })
+    setTimeout(() => navigate('/library'), 1500)
+  }
+
+  const handleCardFile = async (file: File) => {
+    setCardLoading(true)
+    try {
+      const imageUrl = URL.createObjectURL(file)
+      const image = new Image()
+      const imageData: ImageData = await new Promise((resolve, reject) => {
+        image.onload = () => {
+          const canvas = document.createElement('canvas')
+          canvas.width = image.naturalWidth
+          canvas.height = image.naturalHeight
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            reject(new Error('canvas'))
+            return
+          }
+          ctx.drawImage(image, 0, 0)
+          resolve(ctx.getImageData(0, 0, canvas.width, canvas.height))
+        }
+        image.onerror = () => reject(new Error('image'))
+        image.src = imageUrl
+      })
+      URL.revokeObjectURL(imageUrl)
+
+      const code = jsQR(imageData.data, imageData.width, imageData.height)
+      const payload = code ? decodeCardPayload(code.data) : null
+
+      if (!payload) {
+        setPopup({ message: 'QR code illisible sur cette image. Essayez le formulaire.', type: 'error' })
+        return
+      }
+
+      const { data: paymentData } = await supabase
+        .from('payments')
+        .select('*')
+        .ilike('user_email', payload.email)
+        .eq('phone_number', payload.phone)
+        .eq('status', 'completed')
+        .limit(1)
+
+      if (!paymentData?.length) {
+        setPopup({ message: "Aucun accès valide trouvé pour cette carte.", type: 'error' })
+        return
+      }
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('name, city')
+        .eq('email', payload.email)
+        .maybeSingle()
+
+      grantAccess(payload.email, payload.phone, userData?.name, userData?.city)
+    } catch {
+      setPopup({ message: 'Impossible de lire cette carte. Essayez le formulaire.', type: 'error' })
+    } finally {
+      setCardLoading(false)
+    }
   }
 
   return (
-    <div style={styles.container}>
+    <>
       {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
+      <AuthCardLayout name={name} city={city} email={email} phone={phone}>
+          <p className="text-[11px] uppercase tracking-[0.22em] text-gold">Bureau des inscriptions</p>
+          <h1 className="mt-2 font-display text-4xl font-semibold text-parchment">Carte d’entrée</h1>
+          <p className="mt-2 text-sm text-muted">Retrouvez la salle ou commencez le parcours.</p>
 
-      <video autoPlay loop muted playsInline style={styles.video}>
-        <source src={Video} type="video/mp4" />
-      </video>
-
-      <div style={styles.overlay} />
-
-      <div style={styles.content}>
-        <div style={styles.card}>
-          <div className='flex justify-center items-center md:mb-3 gap-3'>
-            <img src={Logo} alt="Logo" className="md:h-15 md:w-15 h-12 w-12 mb-0" />
-            <h1 style={styles.title}>DigiLib</h1>
+          <div className="mt-5 grid grid-cols-2 gap-2 rounded-full border border-gold/25 bg-black/20 p-1">
+            <button
+              type="button"
+              onClick={() => setMode('form')}
+              className={`rounded-full py-2 text-xs uppercase tracking-[0.14em] transition ${
+                mode === 'form' ? 'bg-gold text-ink' : 'text-muted'
+              }`}
+            >
+              Formulaire
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('card')}
+              className={`rounded-full py-2 text-xs uppercase tracking-[0.14em] transition ${
+                mode === 'card' ? 'bg-gold text-ink' : 'text-muted'
+              }`}
+            >
+              Ma carte
+            </button>
           </div>
-          <p style={styles.subtitle}>Accédez à votre bibliothèque</p>
 
-          <form onSubmit={handleSubmitInfo} style={styles.form}>
+          {mode === 'card' ? (
+            <div className="mt-6 flex flex-col gap-4">
+              <p className="text-sm leading-6 text-muted">
+                Uploadez l’image de votre carte de membre DigiLib. Le QR code présent sur la carte nous permet de
+                vérifier votre accès instantanément.
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleCardFile(file)
+                  e.target.value = ''
+                }}
+              />
+              <button
+                type="button"
+                disabled={cardLoading}
+                onClick={() => fileInputRef.current?.click()}
+                className="btn-library bg-gold text-ink disabled:opacity-60"
+              >
+                {cardLoading ? (
+                  <>
+                    <QrCode size={14} className="animate-pulse" /> Vérification...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} /> Uploader ma carte
+                  </>
+                )}
+              </button>
+              <Link to="/" className="text-center text-sm text-muted underline">
+                Retour à l’accueil
+              </Link>
+            </div>
+          ) : (
+          <form onSubmit={handleSubmitInfo} className="mt-6 flex flex-col gap-3">
             {!isReturningUser && (
               <>
                 <input
@@ -206,7 +332,7 @@ export default function AccessPage() {
                   placeholder="Votre nom complet *"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  style={styles.input}
+                  className="field"
                   required
                 />
 
@@ -215,7 +341,7 @@ export default function AccessPage() {
                   placeholder="Votre ville *"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  style={styles.input}
+                  className="field"
                   required
                 />
               </>
@@ -226,7 +352,7 @@ export default function AccessPage() {
               placeholder="Votre email *"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              style={styles.input}
+              className="field"
               required
               disabled={isReturningUser}
             />
@@ -236,30 +362,22 @@ export default function AccessPage() {
               placeholder="Votre numéro de téléphone *"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              style={styles.input}
+              className="field"
               required
             />
 
-            <button
-              type="submit"
-              style={styles.button}
-              disabled={loading}
-            >
-              {loading ? 'Vérification...' : 'Continuer →'}
+            <button type="submit" disabled={loading} className="btn-library bg-gold text-ink disabled:opacity-60">
+              {loading ? 'Vérification...' : 'Continuer'}
             </button>
-
-            <button 
-              type="button"
-              onClick={handleBack} 
-              style={styles.backButton}
-            >
-              Retour à l'accueil
-            </button>
-
+            <Link to="/" className="text-center text-sm text-muted underline">
+              Retour à l’accueil
+            </Link>
             {isReturningUser && (
-              <p style={styles.info}>
-                Pas vous ? <button
+              <p className="text-center text-sm text-muted">
+                Pas vous ?{' '}
+                <button
                   type="button"
+                  className="text-gold underline"
                   onClick={() => {
                     setIsReturningUser(false)
                     setEmail('')
@@ -267,114 +385,14 @@ export default function AccessPage() {
                     localStorage.removeItem('user_email')
                     localStorage.removeItem('user_phone')
                   }}
-                  style={styles.linkButton}
                 >
                   Changer de compte
                 </button>
               </p>
             )}
           </form>
-        </div>
-      </div>
-    </div>
+          )}
+      </AuthCardLayout>
+    </>
   )
-}
-
-const styles = {
-  container: { position: 'relative' as const, minHeight: '100vh', overflow: 'hidden' },
-  video: {
-    position: 'fixed' as const,
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover' as const,
-    zIndex: 0,
-  },
-  backButton: {
-    width: '100%',
-    background: 'transparent',
-    color: '#10b981',
-    padding: '0.75rem',
-    border: '2px solid #10b981',
-    borderRadius: '10px',
-    fontSize: '1rem',
-    cursor: 'pointer',
-    fontWeight: 'bold' as const,
-    transition: 'background 0.3s',
-  },
-  overlay: {
-    position: 'fixed' as const,
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    background: 'linear-gradient(135deg, rgba(227, 229, 233, 0.1) 0%, rgba(210, 209, 212, 0.3) 100%)',
-    zIndex: 1,
-  },
-  content: {
-    position: 'relative' as const,
-    zIndex: 2,
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '2rem',
-  },
-  card: {
-    background: 'rgba(255, 255, 255, 0.98)',
-    borderRadius: '20px',
-    padding: '3rem',
-    maxWidth: '500px',
-    width: '100%',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-    backdropFilter: 'blur(10px)',
-  },
-  title: {
-    fontSize: '2.5rem',
-    fontWeight: '800',
-    color: '#333',
-    marginBottom: '0.5rem',
-    textAlign: 'center' as const,
-  },
-  subtitle: {
-    fontSize: '1.1rem',
-    color: '#666',
-    marginBottom: '2.5rem',
-    textAlign: 'center' as const,
-  },
-  form: { display: 'flex', flexDirection: 'column' as const, gap: '1.25rem' },
-  input: {
-    padding: '1rem',
-    fontSize: '1rem',
-    border: '2px solid #e0e0e0',
-    borderRadius: '12px',
-    outline: 'none',
-    transition: 'border-color 0.3s',
-  },
-  button: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
-    padding: '1rem',
-    border: 'none',
-    borderRadius: '12px',
-    fontSize: '1.1rem',
-    fontWeight: '700',
-    cursor: 'pointer',
-    transition: 'transform 0.2s',
-  },
-  info: {
-    textAlign: 'center' as const,
-    color: '#666',
-    fontSize: '0.9rem',
-    marginTop: '0.5rem',
-  },
-  linkButton: {
-    background: 'none',
-    border: 'none',
-    color: '#667eea',
-    textDecoration: 'underline',
-    cursor: 'pointer',
-    fontSize: '0.9rem',
-  },
 }

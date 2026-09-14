@@ -9,9 +9,10 @@ import {
   CreditCard, 
   Check, 
   Loader,
-  User
+  User,
+  MapPin
 } from 'lucide-react'
-import Video from './vid_ebook2.mp4'
+import { AuthCardLayout } from '../components/AuthCardLayout'
 
 // ⚠️ MODE SIMULATION 
 const SIMULATION_MODE = false
@@ -26,6 +27,7 @@ export default function PaymentPage() {
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
   const [userPhone, setUserPhone] = useState('')
+  const [userCity, setUserCity] = useState('')
   const [step, setStep] = useState<'info' | 'payment'>('info')
   const [popup, setPopup] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
 
@@ -33,15 +35,20 @@ export default function PaymentPage() {
     const tempName = localStorage.getItem('user_name')
     const tempEmail = localStorage.getItem('user_email')
     const tempPhone = localStorage.getItem('user_phone')
-    
-    if (tempName) setUserName(tempName)
-    if (tempEmail) setUserEmail(tempEmail)
-    if (tempPhone) setUserPhone(tempPhone)
-    
-    if (tempEmail && tempPhone) {
-      setStep('payment')
+    const tempCity = localStorage.getItem('user_city')
+
+    if (!tempEmail || !tempPhone) {
+      navigate('/access')
+      return
     }
-  }, [])
+
+    if (tempName) setUserName(tempName)
+    setUserEmail(tempEmail)
+    setUserPhone(tempPhone)
+    if (tempCity) setUserCity(tempCity)
+
+    setStep('payment')
+  }, [navigate])
 
   const handleInfoSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -73,6 +80,16 @@ export default function PaymentPage() {
       })
       return
     }
+
+    if (!userCity.trim()) {
+      setPopup({ message: 'Veuillez entrer votre ville', type: 'error' })
+      return
+    }
+
+    localStorage.setItem('user_name', userName.trim())
+    localStorage.setItem('user_email', userEmail.trim().toLowerCase())
+    localStorage.setItem('user_phone', userPhone.trim())
+    localStorage.setItem('user_city', userCity.trim())
 
     setStep('payment')
   }
@@ -288,334 +305,165 @@ export default function PaymentPage() {
   }
 
   return (
-    <div style={styles.container}>
+    <>
       {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
-      
-      <video autoPlay loop muted playsInline style={styles.video}>
-        <source src={Video} type="video/mp4" />
-      </video>
-      
-      <div style={styles.card}>
-        <button onClick={() => navigate('/')} style={styles.backButton}>
-          <ArrowLeft size={18} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />
+      <AuthCardLayout
+        name={userName}
+        city={userCity}
+        email={userEmail}
+        phone={userPhone}
+        hint={
+          step === 'info'
+            ? 'Modifiez vos informations : la carte se met à jour en direct.'
+            : 'Vos informations sont inscrites sur votre carte DigiLib.'
+        }
+      >
+        <button type="button" onClick={() => navigate('/access')} className="mb-4 inline-flex items-center gap-2 text-sm text-gold">
+          <ArrowLeft size={18} />
           Retour
         </button>
-
-        <h1 style={styles.title}>
-          <CreditCard size={32} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-          Paiement
+        <p className="text-[11px] uppercase tracking-[0.22em] text-gold">
+          {step === 'info' ? 'Modification' : 'Caisse'}
+        </p>
+        <h1 className="mt-2 flex items-center gap-2 font-display text-4xl font-semibold text-parchment">
+          <CreditCard size={28} />
+          {step === 'info' ? 'Vos informations' : 'Carte d’entrée'}
         </h1>
 
         {SIMULATION_MODE && (
-          <div style={styles.simBadge}>
-            🎮 MODE SIMULATION
-          </div>
+          <p className="mt-4 rounded-full bg-gold/20 px-4 py-2 text-center text-sm text-gold-bright">
+            Mode simulation
+          </p>
         )}
 
         {step === 'info' ? (
-          <form onSubmit={handleInfoSubmit} style={styles.form}>
-            <div>
-              <label style={styles.label}>
-                <User size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                Votre nom complet :
-              </label>
-              <input
-                type="text"
-                placeholder="Jean Dupont"
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                style={styles.input}
-                required
-              />
+          <form onSubmit={handleInfoSubmit} className="mt-6 flex flex-col gap-3">
+            <label className="flex items-center gap-2 text-sm text-muted">
+              <User size={16} />
+              Nom complet
+            </label>
+            <input
+              type="text"
+              placeholder="Jean Dupont"
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              className="field"
+              required
+            />
+
+            <label className="flex items-center gap-2 text-sm text-muted">
+              <MapPin size={16} />
+              Ville
+            </label>
+            <input
+              type="text"
+              placeholder="Cotonou"
+              value={userCity}
+              onChange={(e) => setUserCity(e.target.value)}
+              className="field"
+              required
+            />
+
+            <label className="flex items-center gap-2 text-sm text-muted">
+              <Mail size={16} />
+              Email
+            </label>
+            <input
+              type="email"
+              placeholder="exemple@email.com"
+              value={userEmail}
+              onChange={(e) => setUserEmail(e.target.value)}
+              className="field"
+              required
+            />
+
+            <label className="flex items-center gap-2 text-sm text-muted">
+              <Phone size={16} />
+              Téléphone
+            </label>
+            <input
+              type="tel"
+              placeholder="01234567 ou 22901234567"
+              value={userPhone}
+              onChange={(e) => setUserPhone(e.target.value)}
+              className="field"
+              required
+            />
+            <div className="rounded-2xl border border-line bg-ink/30 p-3 text-xs text-muted">
+              <p className="font-medium text-parchment">Formats acceptés</p>
+              <ul className="mt-2 list-inside list-disc space-y-1">
+                <li>Bénin : 01234567 (10 chiffres, commence par 01)</li>
+                <li>Bénin : 22901234567 (avec indicatif)</li>
+                <li>International : +33612345678</li>
+              </ul>
             </div>
 
-            <div>
-              <label style={styles.label}>
-                <Mail size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                Votre adresse email :
-              </label>
-              <input
-                type="email"
-                placeholder="exemple@email.com"
-                value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
-                style={styles.input}
-                required
-              />
-            </div>
-            
-            <div>
-              <label style={styles.label}>
-                <Phone size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                Votre numéro de téléphone :
-              </label>
-              <input
-                type="tel"
-                placeholder="01234567 ou 22901234567"
-                value={userPhone}
-                onChange={(e) => setUserPhone(e.target.value)}
-                style={styles.input}
-                required
-              />
-              <div style={styles.phoneHintBox}>
-                <p style={styles.phoneHint}>
-                  <strong>Formats acceptés :</strong>
-                </p>
-                <ul style={styles.phoneHintList}>
-                  <li>🇧🇯 Bénin : 01234567 (10 chiffres commençant par 01)</li>
-                  <li>🇧🇯 Bénin : 22901234567 (avec indicatif pays)</li>
-                  <li>🌍 International : +33612345678</li>
-                </ul>
-              </div>
-            </div>
-            
-            <button type="submit" style={styles.nextButton}>
+            <button type="submit" className="btn-library bg-gold text-ink">
               Continuer
             </button>
           </form>
         ) : (
-          <>
-            <div style={styles.priceCard}>
-              <p style={styles.priceLabel}>Prix unique</p>
-              <p style={styles.price}>{LIBRARY_ACCESS_PRICE} XOF</p>
-              <p style={styles.priceDescription}>Accès illimité à vie</p>
+          <div className="mt-6 flex flex-col gap-4">
+            <div className="rounded-2xl border border-gold/30 bg-gold/10 p-6 text-center">
+              <p className="text-sm text-muted">Prix unique</p>
+              <p className="font-display text-5xl font-semibold text-gold">{LIBRARY_ACCESS_PRICE} XOF</p>
+              <p className="mt-1 text-sm text-muted">Accès illimité à vie</p>
             </div>
 
-            <div style={styles.benefits}>
-              <h3 style={styles.benefitsTitle}>Ce que vous obtenez :</h3>
-              <ul style={styles.benefitsList}>
-                <li style={styles.benefitItem}>
-                  <Check size={18} style={{ color: '#10b981', marginRight: '0.5rem', flexShrink: 0 }} />
-                  Accès illimité à tous les livres
-                </li>
-                <li style={styles.benefitItem}>
-                  <Check size={18} style={{ color: '#10b981', marginRight: '0.5rem', flexShrink: 0 }} />
-                  Téléchargement sans restriction
-                </li>
-                <li style={styles.benefitItem}>
-                  <Check size={18} style={{ color: '#10b981', marginRight: '0.5rem', flexShrink: 0 }} />
-                  Nouvelles publications régulières
-                </li>
-                <li style={styles.benefitItem}>
-                  <Check size={18} style={{ color: '#10b981', marginRight: '0.5rem', flexShrink: 0 }} />
-                  Accès à vie - un seul paiement
-                </li>
+            <div>
+              <h3 className="font-display text-xl text-parchment">Ce que vous obtenez</h3>
+              <ul className="mt-3 space-y-2 text-sm text-muted">
+                {[
+                  'Accès illimité à tous les livres',
+                  'Téléchargement sans restriction',
+                  'Nouvelles publications régulières',
+                  'Accès à vie — un seul paiement',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <Check size={16} className="mt-0.5 shrink-0 text-success" />
+                    {item}
+                  </li>
+                ))}
               </ul>
             </div>
 
             <button
+              type="button"
               onClick={handleMaketouPayment}
               disabled={loading}
-              style={{
-                ...styles.payButton,
-                ...(loading ? styles.payButtonDisabled : {}),
-              }}
+              className="btn-library flex items-center justify-center gap-2 bg-gold text-ink disabled:opacity-60"
             >
               {loading ? (
                 <>
-                  <Loader size={20} style={{ marginRight: '0.5rem', verticalAlign: 'middle', animation: 'spin 1s linear infinite' }} />
-                  {SIMULATION_MODE ? 'Simulation...' : 'Chargement...'}
+                  <Loader size={18} className="animate-spin" />
+                  {SIMULATION_MODE ? 'Simulation…' : 'Chargement…'}
                 </>
               ) : (
                 <>
-                  <CreditCard size={20} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                  Payer Maintenant
+                  <CreditCard size={18} />
+                  Payer maintenant
                 </>
               )}
             </button>
 
-            <p style={styles.secureText}>
-              {SIMULATION_MODE ? '🎮 Paiement simulé - Mode test' : '🔒 Paiement sécurisé par Maketou'}
+            <p className="text-center text-xs text-muted">
+              {SIMULATION_MODE ? 'Paiement simulé — mode test' : 'Paiement sécurisé par Maketou'}
             </p>
 
-            <button onClick={() => setStep('info')} style={styles.changeInfoButton}>
+            <button
+              type="button"
+              onClick={() => setStep('info')}
+              className="rounded-full border border-line py-2.5 text-sm text-gold transition hover:border-gold/50"
+            >
               Changer les informations
             </button>
-          </>
+          </div>
         )}
-      </div>
-    </div>
+      </AuthCardLayout>
+    </>
   )
 }
 
 function generateAccessToken(): string {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
 }
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, rgba(10, 56, 97, 0.5) 0%, rgba(0, 0, 0, 0.8) 100%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '20px',
-  },
-  card: {
-    background: 'white',
-    borderRadius: '20px',
-    padding: '3rem',
-    maxWidth: '500px',
-    width: '100%',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-    position: 'relative' as const,
-    zIndex: 1,
-  },
-  simBadge: {
-    background: '#f59e0b',
-    color: 'white',
-    padding: '0.5rem 1rem',
-    borderRadius: '10px',
-    textAlign: 'center' as const,
-    fontWeight: 'bold' as const,
-    marginBottom: '1rem',
-    fontSize: '0.9rem',
-  },
-  backButton: {
-    position: 'absolute' as const,
-    top: '1rem',
-    left: '1rem',
-    background: 'transparent',
-    border: 'none',
-    color: '#667eea',
-    cursor: 'pointer',
-    fontSize: '1rem',
-    fontWeight: 'bold' as const,
-    display: 'flex',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: '2rem',
-    color: '#667eea',
-    marginBottom: '2rem',
-    textAlign: 'center' as const,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  form: { display: 'flex', flexDirection: 'column' as const, gap: '1.5rem' },
-  label: { 
-    color: '#333', 
-    fontWeight: 'bold' as const,
-    display: 'flex',
-    alignItems: 'center',
-    marginBottom: '0.5rem',
-  },
-  input: {
-    padding: '0.875rem',
-    fontSize: '1rem',
-    border: '2px solid #e0e0e0',
-    borderRadius: '10px',
-    outline: 'none',
-    width: '100%',
-    transition: 'border-color 0.3s',
-  },
-  phoneHintBox: {
-    background: '#f0f9ff',
-    border: '1px solid #bae6fd',
-    borderRadius: '8px',
-    padding: '0.75rem',
-    marginTop: '0.5rem',
-  },
-  phoneHint: { 
-    fontSize: '0.875rem', 
-    color: '#0369a1', 
-    margin: '0 0 0.5rem 0',
-    fontWeight: 'bold' as const,
-  },
-  phoneHintList: {
-    fontSize: '0.875rem',
-    color: '#075985',
-    margin: 0,
-    paddingLeft: '1.5rem',
-    listStyle: 'none',
-  },
-  nextButton: {
-    background: '#667eea',
-    color: 'white',
-    padding: '0.875rem',
-    border: 'none',
-    borderRadius: '10px',
-    fontSize: '1rem',
-    fontWeight: 'bold' as const,
-    cursor: 'pointer',
-    transition: 'all 0.3s',
-  },
-  priceCard: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
-    padding: '2rem',
-    borderRadius: '15px',
-    textAlign: 'center' as const,
-    marginBottom: '2rem',
-  },
-  priceLabel: { fontSize: '1rem', opacity: 0.9, margin: '0 0 0.5rem 0' },
-  price: { fontSize: '3rem', fontWeight: 'bold' as const, margin: '0' },
-  priceDescription: { fontSize: '1rem', opacity: 0.9, margin: '0.5rem 0 0 0' },
-  benefits: { marginBottom: '2rem' },
-  benefitsTitle: { color: '#333', marginBottom: '1rem' },
-  benefitsList: { 
-    listStyle: 'none', 
-    padding: 0, 
-    margin: 0,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '0.75rem',
-  },
-  benefitItem: {
-    display: 'flex',
-    alignItems: 'center',
-    fontSize: '1rem',
-    color: '#555',
-  },
-  payButton: {
-    width: '100%',
-    background: '#667eea',
-    color: 'white',
-    padding: '1rem',
-    border: 'none',
-    borderRadius: '10px',
-    fontSize: '1.125rem',
-    fontWeight: 'bold' as const,
-    cursor: 'pointer',
-    marginBottom: '1rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.3s',
-  },
-  payButtonDisabled: { opacity: 0.6, cursor: 'not-allowed' },
-  secureText: {
-    textAlign: 'center' as const,
-    color: '#666',
-    fontSize: '0.875rem',
-    marginBottom: '1rem',
-  },
-  changeInfoButton: {
-    width: '100%',
-    background: 'transparent',
-    color: '#667eea',
-    padding: '0.75rem',
-    border: '2px solid #667eea',
-    borderRadius: '10px',
-    fontSize: '1rem',
-    cursor: 'pointer',
-    fontWeight: 'bold' as const,
-    transition: 'all 0.3s',
-  },
-  video: {
-    position: 'absolute' as const,
-    width: '100%',
-    height: '100%',
-    top: 0,
-    left: 0,
-    objectFit: 'cover' as const,
-    opacity: 0.4,
-    zIndex: 0,
-    pointerEvents: 'none' as const,
-  },
-}
-
-const loaderSheet = document.createElement('style')
-loaderSheet.textContent = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`
-document.head.appendChild(loaderSheet)

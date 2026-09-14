@@ -53,7 +53,6 @@ export function OTPPopup({ code, onClose }: OTPPopupProps) {
     </div>
   )
 }
-
 const styles = {
   overlay: {
     position: 'fixed' as const,

@@ -1,20 +1,21 @@
-import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { toPng } from 'html-to-image'
 import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
-import Logo from './logo2.png'
-import '../index.css'
-import {
-  BookOpen,
-  LogOut,
-  ArrowLeft,
-  Search,
-  Download,
-  Eye,
-  ArrowRight,
-  User,
-  MessageCircleMore
-} from 'lucide-react'
+import { LoadingScreen } from '../components/LoadingScreen'
+import { CoverImage } from '../components/CoverImage'
+import { LibraryChrome, ROMANS } from '../components/library/LibraryChrome'
+import { EntryCard } from '../components/EntryCard'
+import { getDirectDownloadLink } from '../lib/drive'
+import { ArrowLeft, Search, Download, Eye } from 'lucide-react'
+import AislePhoto from './bg2.jpg'
+
+const dust = [
+  { left: '12%', bottom: '18%', delay: '0s' },
+  { left: '46%', bottom: '22%', delay: '3.2s' },
+  { left: '78%', bottom: '24%', delay: '2.4s' },
+]
 
 interface Category {
   id: string
@@ -22,6 +23,7 @@ interface Category {
   color: string
   icon: string
   description?: string
+  image_url?: string
 }
 
 interface Book {
@@ -39,143 +41,73 @@ interface Book {
 
 export default function LibraryPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const [categories, setCategories] = useState<Category[]>([])
   const [books, setBooks] = useState<Book[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [userName, setUserName] = useState('')
+  const [userCity, setUserCity] = useState('')
+  const [userEmailInfo, setUserEmailInfo] = useState('')
+  const [userPhone, setUserPhone] = useState('')
+  const [downloadingCard, setDownloadingCard] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
   const [popup, setPopup] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     checkAccessAndLoadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ✅ Restaurer la catégorie sélectionnée depuis localStorage
   useEffect(() => {
-    const savedCategoryId = localStorage.getItem('selected_category_id')
-    if (savedCategoryId) {
-      setSelectedCategory(savedCategoryId)
-    }
+    const saved = localStorage.getItem('selected_category_id')
+    if (saved) setSelectedCategory(saved)
   }, [])
 
-  // ✅ Gérer le bouton "Retour" du navigateur
   useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
+    const handlePopState = () => {
       if (selectedCategory) {
-        event.preventDefault()
         setSelectedCategory(null)
         setSearchQuery('')
-        localStorage.removeItem('selected_category_id') // ← NOUVEAU
+        localStorage.removeItem('selected_category_id')
       }
     }
-
-    if (selectedCategory) {
-      window.history.pushState({ categoryView: true }, '')
-    }
-
+    if (selectedCategory) window.history.pushState({ categoryView: true }, '')
     window.addEventListener('popstate', handlePopState)
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState)
-    }
+    return () => window.removeEventListener('popstate', handlePopState)
   }, [selectedCategory])
-
-  const getCoverImageUrl = (coverUrl: string) => {
-    if (!coverUrl) {
-      return 'https://via.placeholder.com/280x400/667eea/ffffff?text=Pas+de+couverture'
-    }
-
-    if (coverUrl.includes('drive.google.com')) {
-      const fileIdMatch = coverUrl.match(/\/d\/([a-zA-Z0-9_-]+)/)
-      if (fileIdMatch && fileIdMatch[1]) {
-        return `https://drive.google.com/thumbnail?id=${fileIdMatch[1]}&sz=w400`
-      }
-    }
-
-    return coverUrl
-  }
-
-  const getDirectDownloadLink = (driveLink: string, driveFileId?: string) => {
-    if (driveFileId) {
-      return `https://drive.google.com/uc?export=download&id=${driveFileId}`
-    }
-
-    if (driveLink && driveLink.includes('drive.google.com')) {
-      const match = driveLink.match(/\/d\/([a-zA-Z0-9_-]+)/)
-      if (match && match[1]) {
-        return `https://drive.google.com/uc?export=download&id=${match[1]}`
-      }
-    }
-
-    return driveLink
-  }
-
-  const handleDownload = async (book: Book, e: React.MouseEvent) => {
-    e.stopPropagation()
-
-    setPopup({ message: 'Téléchargement en cours...', type: 'info' })
-
-    try {
-      const { data: bookData } = await supabase
-        .from('books')
-        .select('drive_link, drive_file_id, downloads')
-        .eq('id', book.id)
-        .single()
-
-      if (bookData) {
-        const finalUrl = getDirectDownloadLink(bookData.drive_link, bookData.drive_file_id)
-        window.open(finalUrl, '_blank')
-
-        await supabase
-          .from('books')
-          .update({ downloads: (bookData.downloads || 0) + 1 })
-          .eq('id', book.id)
-
-        setPopup({ message: 'Téléchargement lancé !', type: 'success' })
-      }
-    } catch (error) {
-      console.error('Erreur téléchargement:', error)
-      setPopup({ message: 'Erreur lors du téléchargement', type: 'error' })
-    }
-  }
 
   const checkAccessAndLoadData = async () => {
     try {
       const userEmail = localStorage.getItem('user_email')
       const accessToken = localStorage.getItem('library_access_token')
       let storedName = localStorage.getItem('user_name')
-
       if (!accessToken || !userEmail) {
         navigate('/')
         return
       }
-
       if (!storedName && userEmail) {
         storedName = userEmail.split('@')[0]
         localStorage.setItem('user_name', storedName)
       }
-
       setUserName(storedName || '')
-
+      setUserEmailInfo(userEmail || '')
+      setUserCity(localStorage.getItem('user_city') || '')
+      setUserPhone(localStorage.getItem('user_phone') || '')
       const { data: paymentData } = await supabase
         .from('payments')
         .select('*')
         .eq('user_email', userEmail)
         .eq('status', 'completed')
         .limit(1)
-
-      if (!paymentData || paymentData.length === 0) {
+      if (!paymentData?.length) {
         setPopup({ message: 'Accès non autorisé', type: 'error' })
         setTimeout(() => navigate('/'), 2000)
         return
       }
-
       await loadData()
-    } catch (error) {
-      console.error('Erreur:', error)
+    } catch {
       navigate('/')
     }
   }
@@ -184,481 +116,249 @@ export default function LibraryPage() {
     try {
       const [categoriesResult, booksResult] = await Promise.all([
         supabase.from('categories').select('*').order('name'),
-        supabase.from('books').select('id, title, author, description, cover_url, drive_link, drive_file_id, downloads, category_id, categories(*)').order('created_at', { ascending: false })
+        supabase
+          .from('books')
+          .select('id, title, author, description, cover_url, drive_link, drive_file_id, downloads, category_id, categories(*)')
+          .order('created_at', { ascending: false }),
       ])
-
-      if (categoriesResult.data) setCategories(categoriesResult.data)
+      let nextCategories = categoriesResult.data || []
+      if (categoriesResult.error) {
+        setLoadError(categoriesResult.error.message)
+        const fallback = await supabase.from('categories').select('id, name, color, icon, description').order('name')
+        nextCategories = fallback.data || []
+      }
+      setCategories(nextCategories)
       if (booksResult.data) setBooks(booksResult.data)
-    } catch (error) {
-      console.error('Error loading data:', error)
+    } catch {
+      setLoadError('Impossible de charger les rayons.')
     } finally {
       setLoading(false)
     }
   }
 
+  const categoryImage = (category: Category) =>
+    category.image_url || books.find((b) => b.category_id === category.id)?.cover_url || ''
+
   const handleLogout = () => {
-    localStorage.removeItem('library_access_token')
-    localStorage.removeItem('user_email')
-    localStorage.removeItem('user_name')
-    localStorage.removeItem('user_city')
-    localStorage.removeItem('selected_category_id') // ← NOUVEAU
-    setPopup({ message: 'Déconnexion réussie !', type: 'success' })
-    setTimeout(() => navigate('/'), 1000)
+    ;['library_access_token', 'user_email', 'user_name', 'user_city', 'selected_category_id'].forEach((k) =>
+      localStorage.removeItem(k)
+    )
+    navigate('/')
   }
 
-  const handleCategoryClick = (categoryId: string) => {
-    setSelectedCategory(categoryId)
-    // ✅ Sauvegarder la catégorie sélectionnée dans localStorage
-    localStorage.setItem('selected_category_id', categoryId)
-  }
-
-  const handleBookClick = (bookId: string) => {
-    // ✅ La catégorie est déjà sauvegardée, naviguer vers les détails
-    navigate(`/book/${bookId}`)
+  const handleCategoryClick = (id: string) => {
+    setSelectedCategory(id)
+    localStorage.setItem('selected_category_id', id)
   }
 
   const handleBackToCategories = () => {
     setSelectedCategory(null)
     setSearchQuery('')
-    // ✅ Supprimer la catégorie sauvegardée
     localStorage.removeItem('selected_category_id')
     window.history.back()
   }
 
-  const filteredBooks = selectedCategory
-    ? books.filter(book => book.category_id === selectedCategory &&
-      book.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    : []
-
-  if (loading) {
-    return (
-      <div style={styles.loading}>
-        <div style={styles.spinner}></div>
-        <p style={styles.loadingText}>Chargement...</p>
-      </div>
-    )
+  const handleDownload = async (book: Book, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setPopup({ message: 'Téléchargement en cours...', type: 'info' })
+    try {
+      const { data: bookData } = await supabase.from('books').select('drive_link, drive_file_id, downloads').eq('id', book.id).single()
+      if (bookData) {
+        window.open(getDirectDownloadLink(bookData.drive_link, bookData.drive_file_id), '_blank')
+        await supabase.from('books').update({ downloads: (bookData.downloads || 0) + 1 }).eq('id', book.id)
+        setPopup({ message: 'Téléchargement lancé !', type: 'success' })
+      }
+    } catch {
+      setPopup({ message: 'Erreur lors du téléchargement', type: 'error' })
+    }
   }
 
+  const handleDownloadCard = async () => {
+    if (!cardRef.current || downloadingCard) return
+    setDownloadingCard(true)
+    const faceEl = cardRef.current.querySelector<HTMLElement>('.entry-card-face')
+    const prevTransform = faceEl?.style.transform
+    const prevTransition = faceEl?.style.transition
+    try {
+      if (faceEl) {
+        faceEl.style.transition = 'none'
+        faceEl.style.transform = 'none'
+      }
+      const dataUrl = await toPng(cardRef.current, { pixelRatio: 3, cacheBust: true })
+      const link = document.createElement('a')
+      const safeName = (userName || 'membre').trim().toLowerCase().replace(/\s+/g, '-')
+      link.download = `digilib-carte-${safeName}.png`
+      link.href = dataUrl
+      link.click()
+    } catch {
+      setPopup({ message: 'Impossible de télécharger la carte.', type: 'error' })
+    } finally {
+      if (faceEl) {
+        faceEl.style.transform = prevTransform || ''
+        faceEl.style.transition = prevTransition || ''
+      }
+      setDownloadingCard(false)
+    }
+  }
+
+  if (loading) return <LoadingScreen message="Ouverture de la salle..." />
+
+  const currentCategory = categories.find((c) => c.id === selectedCategory)
+  const filteredBooks = selectedCategory
+    ? books.filter((b) => b.category_id === selectedCategory && b.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    : []
+
+  const heroImage = currentCategory ? categoryImage(currentCategory) : ''
+
   return (
-    <>
-      <div style={styles.container} className='container'>
+    <LibraryChrome onHome={() => navigate('/library')} onLogout={handleLogout}>
+      {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
 
-        {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
-
-        <header style={styles.header}>
-          <h1 style={styles.logo}>
-            <img src={Logo} alt="Logo" className="md:h-15 md:w-15 h-10 w-10" />
-            DigiLib
-          </h1>
-          <button onClick={handleLogout} style={styles.logoutButton}>
-            <LogOut size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-            Quitter
-          </button>
-        </header>
-
-        <div style={styles.content} className='mb-20 '>
-          {!selectedCategory ? (
-            // VUE CATÉGORIES
-            <>
-              <div style={styles.welcomeSection}>
-                <div style={styles.userGreeting} className=''>
-                  <User size={32} style={{ marginBottom: '0.5rem' }} />
-                  <h2 style={styles.greetingText}>Bienvenue, {userName}</h2>
-                </div>
-                <h2 style={styles.welcomeTitle}>Explorez votre bibliothèque</h2>
-                <p style={styles.welcomeSubtitle}>Choisissez une catégorie pour découvrir vos livres</p>
+      {!selectedCategory ? (
+        <>
+          <section className="relative min-h-[70vh] overflow-hidden">
+            <img src={AislePhoto} alt="" className="kenburns absolute inset-0 h-full w-full object-cover object-[30%_center]" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#1a100c] via-[#1a100c]/78 to-[#1a100c]/15" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#1a100c] via-transparent to-[#1a100c]/25" />
+            <div className="dust">
+              {dust.map((p) => (
+                <span key={p.left + p.delay} style={{ left: p.left, bottom: p.bottom, animationDelay: p.delay }} />
+              ))}
+            </div>
+            <div className="relative z-10 mx-auto flex min-h-[70vh] max-w-[1680px] flex-col items-center gap-10 px-3 py-20 sm:px-4 lg:flex-row lg:items-center lg:justify-between lg:gap-16 lg:px-6">
+              <div className="max-w-xl">
+                <div className="gold-rule" />
+                <p className="mt-6 text-[11px] uppercase tracking-[0.32em] text-[#d4a574]">La salle</p>
+                <h1 className="mt-5 font-display text-5xl font-semibold leading-[0.96] text-[#f6efe4] sm:text-7xl">
+                  {userName || 'Lecteur'}
+                  <span className="mt-1 block italic font-medium text-[#d4a574]">vos rayons vous attendent.</span>
+                </h1>
+                <p className="mt-6 max-w-md text-base leading-8 text-[#f6efe4]/78">Choisissez un rayon. L’image ouvre la collection.</p>
               </div>
-
-              <div style={styles.categoriesGrid}>
-                {categories.map((category) => (
-                  <div
-                    key={category.id}
-                    onClick={() => handleCategoryClick(category.id)}
-                    style={{
-                      ...styles.categoryCard,
-                      background: `linear-gradient(135deg, ${category.color}ee 0%, ${category.color}cc 100%)`,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-10px) scale(1.03)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0) scale(1)'
-                    }}
-                  >
-                    <div style={styles.categoryIcon}>{category.icon}</div>
-                    <h3 style={styles.categoryName}>{category.name}</h3>
-                    <p style={styles.categoryDesc}>{category.description}</p>
-                    <div style={styles.categoryArrow}>
-                      <ArrowRight size={24} />
-                    </div>
+              <div className="order-first flex w-full max-w-[380px] shrink-0 flex-col items-center gap-4 lg:order-none">
+                <div className="w-full lg:origin-center lg:scale-125 xl:scale-[1.4]">
+                  <div ref={cardRef}>
+                    <EntryCard name={userName} city={userCity} email={userEmailInfo} phone={userPhone} />
                   </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            // VUE LIVRES
-            <>
-              <div style={styles.breadcrumb}>
+                </div>
                 <button
-                  onClick={handleBackToCategories}
-                  style={styles.backButton}
+                  type="button"
+                  onClick={handleDownloadCard}
+                  disabled={downloadingCard}
+                  className="btn-library border border-[#d4a574]/40 text-[#f6efe4] disabled:opacity-60 lg:mt-8 xl:mt-12"
                 >
-                  <ArrowLeft size={20} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                  Retour aux catégories
+                  <Download size={14} /> {downloadingCard ? 'Génération...' : 'Télécharger ma carte'}
                 </button>
-                <h2 style={styles.categoryTitle}>
-                  {categories.find(c => c.id === selectedCategory)?.icon}{' '}
-                  {categories.find(c => c.id === selectedCategory)?.name}
-                </h2>
               </div>
+            </div>
+          </section>
 
-              <div style={styles.searchBar}>
-                <Search size={20} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
-                <input
-                  type="text"
-                  placeholder="Rechercher un livre..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={styles.searchInput}
-                />
-              </div>
-
-              {filteredBooks.length === 0 ? (
-                <p style={styles.emptyMessage}>Aucun livre dans cette catégorie</p>
-              ) : (
-                <div style={styles.booksGrid}>
-                  {filteredBooks.map((book) => (
-                    <div
-                      key={book.id}
-                      style={styles.bookCard}
-                      onClick={() => handleBookClick(book.id)}
-                    >
-                      <img
-                        src={getCoverImageUrl(book.cover_url)}
-                        style={styles.bookCover}
-                        onError={(e) => {
-                          e.currentTarget.src = 'https://via.placeholder.com/280x400/667eea/ffffff?text=Erreur+image'
-                        }}
-                      />
-                      <div style={styles.bookInfo}>
-                        <h3 style={styles.bookTitle}>{book.title}</h3>
-                        {book.author && (
-                          <p style={styles.bookAuthor}>Par {book.author}</p>
-                        )}
-                        <p style={styles.bookDescription}>
-                          {book.description.substring(0, 100)}...
+          <div className="mx-auto max-w-[1680px] px-3 pb-16 sm:px-4 lg:px-6">
+            {loadError && <p className="mb-8 text-sm text-[#e86b6b]">{loadError}</p>}
+            {categories.length === 0 && !loadError && <p className="py-16 text-[#f6efe4]/80">Aucun rayon n’est encore ouvert.</p>}
+            <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {categories.map((category, i) => {
+                const count = books.filter((b) => b.category_id === category.id).length
+                const image = categoryImage(category)
+                return (
+                  <button key={category.id} type="button" onClick={() => handleCategoryClick(category.id)} className="catalog-card">
+                    <div className="catalog-photo">
+                      {image ? (
+                        <CoverImage src={image} alt={category.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="grid h-full place-items-center px-3">
+                          <p className="text-center font-display text-xl text-[#8b5a2b]">{category.name}</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="catalog-card-body">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-display text-xl italic text-[#8b5a2b]">{ROMANS[i] || i + 1}</p>
+                        <p className="text-[10px] uppercase tracking-[0.16em] text-[#8b5a2b]">
+                          {count} {count > 1 ? 'titres' : 'titre'}
                         </p>
-                        <div style={styles.bookActions}>
-                          <button
-                            style={styles.detailsButton}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleBookClick(book.id)
-                            }}
-                          >
-                            <Eye size={16} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                            Voir plus
+                      </div>
+                      <h2 className="mt-3 font-display text-2xl font-semibold leading-snug text-[#24160f]">{category.name}</h2>
+                      {category.description && <p className="mt-2 text-sm leading-6 text-[#6b5e52]">{category.description}</p>}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <section className="relative min-h-[42vh] overflow-hidden">
+            {heroImage ? (
+              <CoverImage src={heroImage} alt="" size={1200} className="absolute inset-0 h-full w-full object-cover" />
+            ) : (
+              <img src={AislePhoto} alt="" className="absolute inset-0 h-full w-full object-cover opacity-50" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#1a100c] via-[#1a100c]/82 to-[#1a100c]/35" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#1a100c] via-transparent to-[#1a100c]/40" />
+            <div className="relative z-10 mx-auto max-w-[1680px] px-3 py-14 sm:px-4 lg:px-6">
+              <button
+                type="button"
+                onClick={handleBackToCategories}
+                className="mb-6 inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[#d4a574]"
+              >
+                <ArrowLeft size={14} />
+                Toutes les cartes
+              </button>
+              <div className="gold-rule" />
+              <p className="mt-6 text-[11px] uppercase tracking-[0.22em] text-[#d4a574]">Rayon</p>
+              <h1 className="mt-2 font-display text-5xl font-semibold text-[#f6efe4]">{currentCategory?.name}</h1>
+              {currentCategory?.description && (
+                <p className="mt-3 max-w-xl text-sm leading-7 text-[#f6efe4]/70">{currentCategory.description}</p>
+              )}
+            </div>
+          </section>
+
+          <div className="mx-auto max-w-[1680px] px-3 py-10 sm:px-4 lg:px-6">
+            <div className="relative mb-10 max-w-xl">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#d4a574]" />
+              <input
+                type="text"
+                placeholder="Chercher dans ce rayon"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="field pl-11"
+              />
+            </div>
+            {filteredBooks.length === 0 ? (
+              <p className="py-16 text-center text-[#f6efe4]/50">Aucun livre dans ce rayon.</p>
+            ) : (
+              Array.from({ length: Math.ceil(filteredBooks.length / 4) }, (_, row) =>
+                filteredBooks.slice(row * 4, row * 4 + 4)
+              ).map((rowBooks, row) => (
+                <div key={row}>
+                  <div className="grid items-end gap-10 sm:grid-cols-2 lg:grid-cols-4">
+                    {rowBooks.map((book) => (
+                      <article key={book.id} onClick={() => navigate(`/book/${book.id}`)} className="flex cursor-pointer flex-col items-center">
+                        <div className="book-3d w-[min(100%,220px)]">
+                          <CoverImage src={book.cover_url} alt={book.title} className="book-face" />
+                        </div>
+                        <h3 className="mt-7 text-center font-display text-2xl leading-snug text-[#f6efe4]">{book.title}</h3>
+                        {book.author && <p className="mt-1 text-sm text-[#d4a574]">Par {book.author}</p>}
+                        <div className="mt-4 flex w-full max-w-[220px] flex-col gap-2">
+                          <button type="button" onClick={(e) => { e.stopPropagation(); navigate(`/book/${book.id}`) }} className="btn-library bg-[#d4a574] text-[#1a100c]">
+                            <Eye size={14} /> Voir
                           </button>
-                          <button
-                            style={styles.downloadButtonSmall}
-                            onClick={(e) => handleDownload(book, e)}
-                            className='w-full justify-center items-center'
-                          >
-                            <Download size={16} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                            Télécharger
+                          <button type="button" onClick={(e) => handleDownload(book, e)} className="btn-library border border-[#d4a574]/40 text-[#f6efe4]">
+                            <Download size={14} /> Télécharger
                           </button>
                         </div>
-                      </div>
-                    </div>
-                  ))}
+                      </article>
+                    ))}
+                  </div>
+                  <div className="wood-shelf mt-10 mb-10" />
                 </div>
-              )}
-            </>
-          )}
-        </div>
-
-        <footer className=' flex justify-center items-center h-[30px]  bg-black pt-1 fixed bottom-0 mt-10 left-0 right-0 ' >
-           <a
-                            href="https://wa.me/22941822980?text=Bonjour%2C%20j'aimerais%20avoir%20acc%C3%A8s%20%C3%A0%20la%20biblioth%C3%A8que%20DigiLib"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ ...styles.contactLink, cursor: 'pointer' }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = '#25D366'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
-                          >
-                            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem' }} className='flex items-center gap-2'>
-                              <MessageCircleMore size={20} strokeWidth={2} />Pour nous contacter cliquer ici
-                            </span>
-                            </a>
-        </footer>
-      </div>
-
-    </>
-
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </LibraryChrome>
   )
 }
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-  },
-
-  header: {
-    background: 'rgba(16, 6, 6, 0.8)',
-    padding: '1rem 1.5rem',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    position: 'sticky' as const,
-    top: 0,
-    zIndex: 100,
-  },
-  logo: {
-    margin: 0,
-    color: 'rgba(102, 126, 234, 1)',
-    fontSize: 'clamp(1.2rem, 4vw, 1.5rem)',
-    display: 'flex',
-    alignItems: 'center',
-    fontWeight: 'bold',
-  },
-  logoutButton: {
-    background: '#ef4444',
-    color: 'white',
-    padding: '0.5rem 1rem',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: '600',
-    fontSize: 'clamp(0.8rem, 2vw, 0.9rem)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.3rem',
-    transition: 'all 0.3s',
-  },
-  contactLink: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem',
-    color: 'rgba(255,255,255,0.8)',
-    textDecoration: 'none',
-    transition: 'color 0.3s ease',
-    fontSize: 'clamp(0.85rem, 2vw, 0.95rem)',
-  },
-  content: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    marginBottom: '1.5rem',
-    padding: 'clamp(1rem, 3vw, 2rem)',
-  },
-  welcomeSection: {
-    textAlign: 'center' as const,
-    marginBottom: 'clamp(2rem, 5vw, 3rem)',
-  },
-  userGreeting: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    marginBottom: '1.5rem',
-    padding: '1.5rem',
-    opacity: 0.9,
-    background: 'linear-gradient(135deg, #667eeaff 50%, #422b5aff 50%)',
-    borderRadius: '20px',
-    color: 'white',
-    boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)',
-  },
-  greetingText: {
-    fontSize: 'clamp(1.5rem, 4vw, 2rem)',
-    fontWeight: '700',
-    margin: 0,
-  },
-  welcomeTitle: {
-    fontSize: 'clamp(1.8rem, 5vw, 2.5rem)',
-    color: '#ffffffff',
-    marginBottom: '0.5rem',
-    fontWeight: '700',
-  },
-  welcomeSubtitle: {
-    fontSize: 'clamp(1rem, 3vw, 1.1rem)',
-    color: '#d4d7deff',
-  },
-  categoriesGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))',
-    gap: 'clamp(1rem, 3vw, 2rem)',
-  },
-  categoryCard: {
-    padding: 'clamp(1.5rem, 4vw, 2.5rem) clamp(1rem, 3vw, 2rem)',
-    borderRadius: '20px',
-    color: 'white',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-    position: 'relative' as const,
-  },
-  categoryIcon: {
-    fontSize: 'clamp(2.5rem, 7vw, 3.5rem)',
-    marginBottom: '1rem',
-  },
-  categoryName: {
-    fontSize: 'clamp(1.2rem, 4vw, 1.5rem)',
-    fontWeight: '700',
-    marginBottom: '0.5rem',
-  },
-  categoryDesc: {
-    fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)',
-    opacity: 0.9,
-    margin: 0,
-  },
-  categoryArrow: {
-    position: 'absolute' as const,
-    bottom: '1.5rem',
-    right: '1.5rem',
-    fontSize: '1.5rem',
-    fontWeight: 'bold' as const,
-  },
-  breadcrumb: { marginBottom: '2rem' },
-  backButton: {
-    background: '#667eea',
-    color: 'white',
-    padding: '0.75rem 1.5rem',
-    border: 'none',
-    borderRadius: '10px',
-    cursor: 'pointer',
-    fontSize: 'clamp(0.9rem, 2.5vw, 1rem)',
-    fontWeight: '600',
-    marginBottom: '1rem',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    transition: 'all 0.3s',
-  },
-  categoryTitle: {
-    fontSize: 'clamp(1.5rem, 5vw, 2rem)',
-    color: '#ffffffff',
-    margin: '1rem 0',
-  },
-  searchBar: {
-    marginBottom: '2rem',
-    position: 'relative' as const,
-  },
-  searchInput: {
-    width: '100%',
-    padding: '1rem 1rem 1rem 3rem',
-    fontSize: 'clamp(0.9rem, 2.5vw, 1rem)',
-    border: '2px solid #e0e0e0',
-    borderRadius: '12px',
-    outline: 'none',
-    color:'white',
-    transition: 'border-color 0.3s',
-  },
-  booksGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(min(250px, 100%), 1fr))',
-    gap: 'clamp(1rem, 3vw, 2rem)',
-  },
-  bookCard: {
-    background: 'white',
-    borderRadius: '15px',
-    overflow: 'hidden',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-    transition: 'transform 0.3s, box-shadow 0.3s',
-    cursor: 'pointer',
-  },
-  bookCover: {
-    width: '100%',
-    height: 'clamp(300px, 40vw, 350px)',
-    objectFit: 'cover' as const,
-  },
-  bookInfo: { padding: 'clamp(1rem, 3vw, 1.5rem)' },
-  bookTitle: {
-    margin: '0 0 0.5rem 0',
-    color: '#333',
-    fontSize: 'clamp(1rem, 3vw, 1.2rem)',
-    fontWeight: '700',
-  },
-  bookAuthor: {
-    margin: '0 0 0.75rem 0',
-    color: '#667eea',
-    fontSize: 'clamp(0.85rem, 2.5vw, 0.9rem)',
-    fontWeight: '600',
-  },
-  bookDescription: {
-    color: '#666',
-    fontSize: 'clamp(0.85rem, 2.5vw, 0.9rem)',
-    marginBottom: '1rem',
-    lineHeight: 1.5,
-  },
-  bookActions: {
-    display: 'flex',
-    gap: '0.5rem',
-    flexWrap: 'wrap' as const,
-  },
-  detailsButton: {
-    flex: 1,
-    minWidth: '120px',
-    background: '#667eea',
-    color: 'white',
-    padding: '0.75rem',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: '600',
-    fontSize: 'clamp(0.8rem, 2vw, 0.9rem)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.3rem',
-    transition: 'all 0.3s',
-  },
-  downloadButtonSmall: {
-    background: '#10b981',
-    color: 'white',
-    padding: '0.75rem 1rem',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: '600',
-    fontSize: 'clamp(0.75rem, 2vw, 0.85rem)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.3rem',
-    transition: 'all 0.3s',
-    whiteSpace: 'nowrap' as const,
-  },
-  emptyMessage: {
-    textAlign: 'center' as const,
-    fontSize: 'clamp(1rem, 3vw, 1.2rem)',
-    color: '#666',
-    marginTop: '3rem',
-    padding: '2rem',
-  },
-  loading: {
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '2rem',
-  },
-  spinner: {
-    width: 'clamp(40px, 10vw, 60px)',
-    height: 'clamp(40px, 10vw, 60px)',
-    border: '6px solid rgba(255,255,255,0.3)',
-    borderTop: '6px solid white',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-    marginBottom: '1.5rem',
-  },
-  loadingText: {
-    fontSize: 'clamp(1rem, 3vw, 1.25rem)',
-    fontWeight: '600',
-    color: 'white',
-    textAlign: 'center' as const,
-  },
-}
-
-const styleSheet = document.createElement('style')
-styleSheet.textContent = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`
-document.head.appendChild(styleSheet)

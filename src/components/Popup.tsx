@@ -4,74 +4,23 @@ interface PopupProps {
   onClose: () => void
 }
 
+const tones = { success: 'bg-success', error: 'bg-danger', info: 'bg-info' }
+
 export function Popup({ message, type = 'info', onClose }: PopupProps) {
   return (
-    <div style={popupStyles.overlay} onClick={onClose}>
-      <div style={popupStyles.container} onClick={(e) => e.stopPropagation()}>
-        <div style={{
-          ...popupStyles.icon,
-          background: type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'
-        }}>
-          {type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}
+    <div className="fixed inset-0 z-[9999] grid place-items-center bg-black/60 px-4 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-3xl border border-line bg-panel p-8 text-center shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={`mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full text-2xl font-bold text-ink ${tones[type]}`}>
+          {type === 'success' ? '✓' : type === 'error' ? '✕' : 'i'}
         </div>
-        <p style={popupStyles.message}>{message}</p>
-        <button onClick={onClose} style={popupStyles.button}>
+        <p className="text-parchment">{message}</p>
+        <button type="button" onClick={onClose} className="mt-6 rounded-full bg-gold px-6 py-2 text-sm font-semibold text-ink">
           OK
         </button>
       </div>
     </div>
   )
-}
-
-const popupStyles = {
-  overlay: {
-    position: 'fixed' as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 9999,
-  },
-  container: {
-    background: 'white',
-    borderRadius: '20px',
-    padding: '2rem',
-    maxWidth: '400px',
-    width: '90%',
-    textAlign: 'center' as const,
-    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-    animation: 'slideIn 0.3s ease-out',
-  },
-  icon: {
-    width: '60px',
-    height: '60px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: '0 auto 1rem',
-    fontSize: '2rem',
-    color: 'white',
-    fontWeight: 'bold' as const,
-  },
-  message: {
-    fontSize: '1.125rem',
-    color: '#333',
-    marginBottom: '1.5rem',
-    lineHeight: 1.5,
-  },
-  button: {
-    background: '#667eea',
-    color: 'white',
-    padding: '0.75rem 2rem',
-    border: 'none',
-    borderRadius: '10px',
-    cursor: 'pointer',
-    fontSize: '1rem',
-    fontWeight: 'bold' as const,
-  },
 }

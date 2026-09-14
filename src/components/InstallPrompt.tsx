@@ -11,50 +11,28 @@ const InstallPrompt = () => {
   const [showBanner, setShowBanner] = useState(false)
 
   useEffect(() => {
-    // Vérifier si déjà installé
-    const isInstalled = window.matchMedia('(display-mode: standalone)').matches ||
-                       (window.navigator as any).standalone === true
+    const isInstalled =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true
 
-    if (isInstalled) {
-      return
-    }
+    if (isInstalled) return
 
-    // Vérifier si l'utilisateur a déjà fermé la bannière
-    const hasClosedBanner = localStorage.getItem('pwa-banner-closed')
-    if (hasClosedBanner) {
-      return
-    }
+    if (localStorage.getItem('pwa-banner-closed')) return
 
-    // Écouter l'événement beforeinstallprompt
     const handler = (e: Event) => {
       e.preventDefault()
-      const promptEvent = e as BeforeInstallPromptEvent
-      setDeferredPrompt(promptEvent)
+      setDeferredPrompt(e as BeforeInstallPromptEvent)
       setShowBanner(true)
     }
 
     window.addEventListener('beforeinstallprompt', handler)
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler)
-    }
+    return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
   const handleInstall = async () => {
     if (!deferredPrompt) return
-
-    // Afficher le prompt d'installation
     await deferredPrompt.prompt()
-
-    // Attendre la réponse de l'utilisateur
-    const choiceResult = await deferredPrompt.userChoice
-
-    if (choiceResult.outcome === 'accepted') {
-      console.log('✅ PWA installée')
-    } else {
-      console.log('❌ Installation refusée')
-    }
-
+    await deferredPrompt.userChoice
     setDeferredPrompt(null)
     setShowBanner(false)
   }
@@ -67,124 +45,40 @@ const InstallPrompt = () => {
   if (!showBanner) return null
 
   return (
-    <div style={styles.banner}>
-      <div style={styles.content}>
-        <div style={styles.icon}>
-          📱
-        </div>
-        <div style={styles.text}>
-          <h3 style={styles.title}>Installer DigiLib</h3>
-          <p style={styles.description}>
-            Accédez rapidement à votre bibliothèque depuis votre écran d'accueil
+    <div
+      className="pwa-install-banner fixed bottom-4 left-4 right-4 z-[1000] mx-auto max-w-xl"
+      role="dialog"
+      aria-label="Installer l’application DigiLib"
+    >
+      <div className="flex flex-col gap-4 rounded-2xl border border-[#d4a574]/28 bg-[#1a100c] p-4 shadow-[0_16px_48px_rgba(0,0,0,0.45)] sm:flex-row sm:items-center sm:gap-5 sm:p-5">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-[#d4a574]">Application</p>
+          <h3 className="mt-1 font-display text-xl font-semibold text-[#f6efe4]">Installer DigiLib</h3>
+          <p className="mt-1 text-sm leading-6 text-[#f6efe4]/65">
+            Accédez à la salle depuis votre écran d’accueil, comme une application.
           </p>
         </div>
-        <div style={styles.actions}>
-          <button onClick={handleInstall} style={styles.installButton}>
-            <Download size={18} />
-            <span>Installer</span>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={handleInstall}
+            className="btn-library flex items-center gap-2 bg-[#d4a574] px-5 py-2.5 text-[#1a100c]"
+          >
+            <Download size={16} />
+            Installer
           </button>
-          <button onClick={handleClose} style={styles.closeButton}>
-            <X size={20} />
+          <button
+            type="button"
+            onClick={handleClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-[#d4a574]/25 text-[#f6efe4]/80 transition hover:border-[#d4a574]/45 hover:text-[#f6efe4]"
+            aria-label="Fermer"
+          >
+            <X size={18} />
           </button>
         </div>
       </div>
     </div>
   )
 }
-
-const styles = {
-  banner: {
-    position: 'fixed' as const,
-    bottom: '1rem',
-    left: '1rem',
-    right: '1rem',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '16px',
-    boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-    zIndex: 1000,
-    animation: 'slideUp 0.4s ease-out',
-    maxWidth: '600px',
-    margin: '0 auto',
-  },
-  content: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '1rem',
-    padding: '1rem 1.5rem',
-  },
-  icon: {
-    fontSize: '2.5rem',
-    flexShrink: 0,
-  },
-  text: {
-    flex: 1,
-    color: 'white',
-  },
-  title: {
-    margin: '0 0 0.25rem 0',
-    fontSize: '1.1rem',
-    fontWeight: '700',
-  },
-  description: {
-    margin: 0,
-    fontSize: '0.9rem',
-    opacity: 0.95,
-  },
-  actions: {
-    display: 'flex',
-    gap: '0.5rem',
-    alignItems: 'center',
-  },
-  installButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    background: 'white',
-    color: '#667eea',
-    padding: '0.65rem 1.25rem',
-    border: 'none',
-    borderRadius: '10px',
-    cursor: 'pointer',
-    fontWeight: '700',
-    fontSize: '0.95rem',
-    transition: 'transform 0.2s ease',
-    whiteSpace: 'nowrap' as const,
-  },
-  closeButton: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(255,255,255,0.2)',
-    color: 'white',
-    padding: '0.5rem',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    transition: 'background 0.2s ease',
-  },
-}
-
-// Ajouter l'animation
-const styleSheet = document.createElement('style')
-styleSheet.textContent = `
-  @keyframes slideUp {
-    from {
-      transform: translateY(100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  @media (max-width: 640px) {
-    .pwa-banner-content {
-      flex-direction: column;
-      text-align: center;
-    }
-  }
-`
-document.head.appendChild(styleSheet)
 
 export default InstallPrompt

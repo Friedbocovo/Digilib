@@ -1,725 +1,136 @@
-import { BookOpen, MessageCircleMore, Download, Grid, User, ArrowRight, Star, Mail, ChevronDown } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import Video from "./vid_ebook3.mp4"
-import BG from "./bg2.jpg"
-import Logo from "./logo2.png"
+import { Link } from 'react-router-dom'
+import { ChevronDown, Download } from 'lucide-react'
+import AislePhoto from './bg2.jpg'
+import { PublicLayout } from '../components/public/PublicLayout'
+import { CoverImage } from '../components/CoverImage'
+import { BookSpines, ShelfBlock } from '../components/public/BookSpines'
+import { getDirectDownloadLink } from '../lib/drive'
+import { MoreRayonsCta } from '../components/public/MoreRayonsCta'
+import { catalogPreview, faqs, freeBooks, LIBRARY_PRICE } from '../data/publicContent'
 
-interface FreeBook {
-  id: string
-  title: string
-  author?: string
-  cover_url: string
-  drive_link: string
-}
-
-interface FAQ {
-  question: string
-  answer: string
-}
-
-const faqs: FAQ[] = [
-  {
-    question: "Comment ça marche ?",
-    answer: "C'est simple ! Payez une seule fois 2000 XAF via Mobile Money (MTN, Moov ou Celtiis), et accédez à vie à notre bibliothèque complète de milliers de livres. Vous pouvez lire en ligne ou télécharger gratuitement tous les livres que vous voulez."
-  },
-  {
-    question: "Quels sont les modes de paiement ?",
-    answer: "Nous acceptons tous les opérateurs de Mobile Money du Bénin : MTN Money, Moov Money et Celtiis Money. Une fois votre paiement validé, vous recevez immédiatement votre accès."
-  },
-  {
-    question: "Est-ce vraiment un accès à vie ?",
-    answer: "Oui, absolument ! Un seul paiement de 2000 FCFA vous donne un accès illimité et permanent à toute notre bibliothèque. Pas d'abonnement mensuel, pas de frais cachés. Vous payez une fois et c'est pour toujours."
-  },
-  {
-    question: "Puis-je télécharger les livres ?",
-    answer: "Oui ! Tous les livres peuvent être téléchargés gratuitement et sans limite. Une fois téléchargés, vous pouvez les lire même sans connexion internet, sur votre téléphone, tablette ou ordinateur."
-  },
-  {
-    question: "Combien de livres sont disponibles ?",
-    answer: "Notre bibliothèque contient des milliers de livres dans tous les genres : romans, développement personnel, sciences, histoire, biographies, essais, et bien plus encore. Nous ajoutons régulièrement de nouveaux titres."
-  }
-]
-
-// LIVRES GRATUITS EN DUR
-const freeBooks: FreeBook[] = [
-  {
-    id: '1',
-    title: '7 exercices pour durer plus longtemps',
-    cover_url: 'https://drive.google.com/file/d/1jCwHs9qHytb3HLrvSmpwFA7MksibOdOs/view?usp=drivesdk',
-    drive_link: 'https://drive.google.com/file/d/1O7SXPt_34TEz5BN8pqr8m2eCbBiwBIlr/view?usp=drivesdk'
-  },
-  {
-    id: '2',
-    title: 'Réussir sa prise de parole en public',
-    cover_url: 'https://drive.google.com/file/d/1KlLb2abtBsEBLlMKFwp1pxML01IdVM7R/view?usp=drivesdk',
-    drive_link: 'https://drive.google.com/file/d/1lglrtiug7ummMqW-fuM3KeDx-Ht7Etrx/view?usp=sharing'
-  },
-  {
-    id: '3',
-    title: '10 bonnes raisons de devenir entrepreneur',
-    cover_url: 'https://drive.google.com/file/d/1_43l2OLOeZ3JCHsNZ9Wo0uAxeSwPeAyv/view?usp=drivesdk',
-    drive_link: 'https://drive.google.com/file/d/1UhjD6CVuFhWs0eFamwbDyuNNKpRm6kY6/view?usp=sharing'
-  }
+const dust = [
+  { left: '12%', bottom: '18%', delay: '0s' },
+  { left: '28%', bottom: '30%', delay: '1.6s' },
+  { left: '46%', bottom: '22%', delay: '3.2s' },
+  { left: '63%', bottom: '36%', delay: '0.8s' },
+  { left: '78%', bottom: '24%', delay: '2.4s' },
 ]
 
 export default function HomePage() {
-  const navigate = useNavigate()
-  const [openFAQ, setOpenFAQ] = useState<number | null>(null)
-
-  const handleAccessLibrary = () => {
-    navigate('/access')
-  }
-
-  const handleAdminLogin = () => {
-    navigate('/admin-login')
-  }
-
-  const handleDownloadFreeBook = (book: FreeBook) => {
-    try {
-      // Extraire l'ID du fichier Google Drive
-      const match = book.drive_link.match(/\/d\/([a-zA-Z0-9_-]+)/)
-      if (match && match[1]) {
-        const fileId = match[1]
-        const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`
-        window.open(downloadUrl, '_blank')
-      } else {
-        // Si on ne peut pas extraire l'ID, ouvrir le lien original
-        window.open(book.drive_link, '_blank')
-      }
-    } catch (error) {
-      console.error('Erreur téléchargement:', error)
-      // Fallback: ouvrir le lien original
-      window.open(book.drive_link, '_blank')
-    }
-  }
-
-  const getCoverImageUrl = (coverUrl: string) => {
-    if (!coverUrl) {
-      return 'https://via.placeholder.com/200x280/667eea/ffffff?text=Livre'
-    }
-
-    // Extraire l'ID du fichier Google Drive
-    const fileIdMatch = coverUrl.match(/\/d\/([a-zA-Z0-9_-]+)/)
-    if (fileIdMatch && fileIdMatch[1]) {
-      // Utiliser l'API thumbnail de Google Drive
-      return `https://drive.google.com/thumbnail?id=${fileIdMatch[1]}&sz=w400`
-    }
-
-    return coverUrl
-  }
-
-  const toggleFAQ = (index: number) => {
-    setOpenFAQ(openFAQ === index ? null : index)
-  }
+  const [openFAQ, setOpenFAQ] = useState<number | null>(0)
 
   return (
-    <div style={styles.container}>
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        style={styles.video}
-        className='md:flex hidden'
-      >
-        <source src={Video} type="video/mp4" />
-      </video>
-
-      <img src={BG} alt="BG" className='md:hidden flex' style={styles.video} />
-
-      <div style={styles.content}>
-        <header style={styles.header}>
-          <div style={styles.logo} className="flex">
-            <img src={Logo} alt="Logo" className="md:h-15 md:w-15 h-10 w-10" />
-            <span style={styles.logoText}>DigiLib</span>
-          </div>
-<button
-            onClick={handleAccessLibrary}
-           className='h-12 w-auto flex items-center gap-2 bg-white text-purple-600 font-semibold px-4 rounded-lg hover:shadow-lg transition-shadow duration-300'
-          >
-            <span className='md:flex hidden'>Accéder à la Bibliothèque</span>
-            <ArrowRight size={22} strokeWidth={2.5} />
-          </button>
-        </header>
-
-        <main style={styles.hero}>
-          <div style={styles.badge}>
-            <Star size={14} strokeWidth={3} />
-            <span>Accès Illimité</span>
-          </div>
-
-          <h1 style={styles.title} className='md:text-6xl text-4xl'>
-            Votre Bibliothèque<br />
-            Numérique Illimitée
-          </h1>
-
-          <p style={styles.subtitle}>
-            Des milliers de livres. Un seul paiement. Pour toujours.
-          </p>
-
-          <div style={styles.features} className='md:w-[100%] w-[60%] flex-wrap justify-center'>
-            <div style={styles.feature}>
-              <div style={styles.iconWrapper}>
-                <BookOpen size={32} strokeWidth={2} />
-              </div>
-              <h3 style={styles.featureTitle}>Lecture Illimitée</h3>
-              <p style={styles.featureDesc}>
-                Explorez notre catalogue complet sans aucune restriction. Romans, essais, biographies, développement personnel, sciences, histoire et bien plus encore. Lisez autant que vous voulez, quand vous voulez.
-              </p>
-            </div>
-
-            <div style={styles.feature}>
-              <div style={styles.iconWrapper}>
-                <Download size={32} strokeWidth={2} />
-              </div>
-              <h3 style={styles.featureTitle}>Téléchargement Libre</h3>
-              <p style={styles.featureDesc}>
-                Téléchargez tous vos livres préférés sur vos appareils. Lisez hors ligne, sur votre ordinateur, tablette ou smartphone. Emportez votre bibliothèque partout avec vous.
-              </p>
-            </div>
-
-            <div style={styles.feature}>
-              <div style={styles.iconWrapper}>
-                <Grid size={32} strokeWidth={2} />
-              </div>
-              <h3 style={styles.featureTitle}>Tous Les Genres</h3>
-              <p style={styles.featureDesc}>
-                Une diversité incroyable de contenus pour tous les goûts. Fiction, non-fiction, classiques littéraires, best-sellers contemporains, livres académiques.
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={handleAccessLibrary}
-            style={styles.ctaButton}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-3px)'
-              e.currentTarget.style.boxShadow = '0 15px 50px rgba(0,0,0,0.4)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = '0 10px 40px rgba(0,0,0,0.3)'
-            }}
-          >
-            <span>Accéder à la Bibliothèque</span>
-            <ArrowRight size={22} strokeWidth={2.5} />
-          </button>
-
-          {/* SECTION LIVRES GRATUITS */}
-          <div style={styles.freeBooksSection}>
-            <h2 style={styles.freeBooksTitle}>
-              📚 Découvrez nos livres gratuits
-            </h2>
-            <p style={styles.freeBooksSubtitle}>
-              Téléchargez gratuitement ces livres pour découvrir notre bibliothèque
+    <PublicLayout>
+      <section className="relative min-h-[92vh] overflow-hidden">
+        <img src={AislePhoto} alt="Allée de la bibliothèque" className="kenburns absolute inset-0 h-full w-full object-cover object-[30%_center]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#1a100c] via-[#1a100c]/78 to-[#1a100c]/15" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#1a100c]/70 via-transparent to-[#1a100c]/25" />
+        <div className="dust">
+          {dust.map((p) => (
+            <span key={p.left + p.delay} style={{ left: p.left, bottom: p.bottom, animationDelay: p.delay }} />
+          ))}
+        </div>
+        <div className="relative z-10 mx-auto flex min-h-[92vh] max-w-6xl items-center px-5 py-24 md:px-8">
+          <div className="hero-copy max-w-xl">
+            <div className="gold-rule" />
+            <p className="mt-6 text-[11px] uppercase tracking-[0.32em] text-[#d4a574]">Bibliothèque numérique · ouverte 24h/24</p>
+            <h1 className="mt-5 font-display text-5xl font-semibold leading-[0.96] text-[#f6efe4] sm:text-7xl">
+              Une salle
+              <span className="mt-1 block italic font-medium text-[#d4a574]">pour toute une vie.</span>
+            </h1>
+            <p className="mt-6 max-w-md text-base leading-8 text-[#f6efe4]/78">
+              Des milliers d’ouvrages à lire et à emporter. Une carte d’entrée, {LIBRARY_PRICE} XOF, jamais renouvelée.
             </p>
-
-            <div style={styles.freeBooksGrid}>
-              {freeBooks.map((book) => (
-                <div key={book.id} style={styles.freeBookCard}>
-                  <img
-                    src={getCoverImageUrl(book.cover_url)}
-                    alt={book.title}
-                    style={styles.freeBookCover}
-                    onError={(e) => {
-                      e.currentTarget.src = 'https://via.placeholder.com/200x280/667eea/ffffff?text=Livre'
-                    }}
-                  />
-                  <div style={styles.freeBookInfo}>
-                    <h3 style={styles.freeBookTitle}>{book.title}</h3>
-                    {book.author && (
-                      <p style={styles.freeBookAuthor}>{book.author}</p>
-                    )}
-                    <button
-                      onClick={() => handleDownloadFreeBook(book)}
-                      style={styles.downloadFreeButton}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
-                    >
-                      <Download size={18} />
-                      <span>Télécharger</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className="mt-9 flex flex-wrap gap-3">
+              <Link to="/access" className="btn-library bg-[#d4a574] text-[#1a100c]">Prendre sa carte</Link>
+              <Link to="/catalogue" className="btn-library border border-[#d4a574]/45 text-[#f6efe4]">Voir les rayons</Link>
             </div>
           </div>
+        </div>
+      </section>
 
-          {/* SECTION FAQ */}
-          <div style={styles.faqSection}>
-            <h2 style={styles.faqSectionTitle}>❓ Questions Fréquentes</h2>
-            <p style={styles.faqSectionSubtitle}>
-              Tout ce que vous devez savoir sur DigiLib
-            </p>
+      <section className="border-y border-[#24160f]/10 bg-[#1a100c] text-[#f6efe4]">
+        <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 md:grid-cols-3 md:px-8">
+          {[
+            { n: '01', t: 'Carte unique', d: 'Payez une fois. La salle reste ouverte.' },
+            { n: '02', t: 'Téléchargement libre', d: 'Lecture en ligne, fichiers à emporter.' },
+            { n: '03', t: 'Tous les rayons', d: 'Romans, sciences, histoire, affaires.' },
+          ].map((item) => (
+            <div key={item.n} className="md:border-l md:border-[#d4a574]/25 md:pl-6 first:md:border-l-0 first:md:pl-0">
+              <p className="text-[11px] tracking-[0.2em] text-[#d4a574]">{item.n}</p>
+              <h2 className="mt-2 font-display text-2xl">{item.t}</h2>
+              <p className="mt-1 text-sm text-[#f6efe4]/60">{item.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-            <div style={styles.faqContainer}>
-              {faqs.map((faq, index) => (
-                <div key={index} style={styles.faqItem}>
-                  <button
-                    onClick={() => toggleFAQ(index)}
-                    style={{
-                      ...styles.faqQuestion,
-                      ...(openFAQ === index ? styles.faqQuestionActive : {})
-                    }}
-                  >
-                    <span>{faq.question}</span>
-                    <ChevronDown
-                      size={24}
-                      style={{
-                        transition: 'transform 0.3s ease',
-                        transform: openFAQ === index ? 'rotate(180deg)' : 'rotate(0deg)'
-                      }}
-                    />
-                  </button>
+      <section className="mx-auto max-w-6xl px-5 py-20 md:px-8">
+        <div className="gold-rule" />
+        <p className="mt-6 text-[11px] uppercase tracking-[0.22em] text-[#8b5a2b]">Aperçu</p>
+        <h2 className="mt-2 font-display text-4xl font-semibold text-[#24160f]">Les rayonnages</h2>
+        <div className="mt-10 grid gap-12 md:grid-cols-2">
+          {catalogPreview.map((cat) => (
+            <ShelfBlock key={cat.name} title={cat.name} meta={`+${cat.count} titres`}>
+              <BookSpines colors={cat.spines} labels={[cat.name]} />
+            </ShelfBlock>
+          ))}
+        </div>
 
-                  {openFAQ === index && (
-                    <div style={styles.faqAnswer}>
-                      <p>{faq.answer}</p>
-                    </div>
-                  )}
+        <MoreRayonsCta className="mt-14" />
+      </section>
+
+      <section className="mx-auto max-w-6xl px-5 pb-20 md:px-8">
+        <div className="gold-rule" />
+        <p className="mt-6 text-[11px] uppercase tracking-[0.22em] text-[#8b5a2b]">Consultation libre</p>
+        <h2 className="mt-2 font-display text-4xl font-semibold text-[#24160f]">Sur la table</h2>
+        <div className="mt-10 bg-[#2a1b12]/6 px-4 pt-12 sm:px-10">
+          <div className="grid items-end gap-10 sm:grid-cols-3">
+            {freeBooks.map((book) => (
+              <article key={book.id} className="book-float flex flex-col items-center">
+                <div className="book-3d w-[min(100%,220px)]">
+                  <CoverImage src={book.cover_url} alt={book.title} className="book-face" />
                 </div>
-              ))}
-            </div>
-          </div>
-        </main>
-
-        {/* FOOTER */}
-        <footer style={styles.footer}>
-          <div style={styles.footerContent}>
-            {/* LOGO (Gauche) */}
-            <div style={styles.footerSection}>
-              <div style={styles.footerLogo}>
-            <img src={Logo} alt="Logo" className="md:h-15 md:w-15 h-10 w-10" />
-                <span style={styles.footerLogoText}>DigiLib</span>
-              </div>
-              <p style={styles.footerTagline}>
-                Votre bibliothèque numérique illimitée
-              </p>
-            </div>
-
-            {/* CONTACT (Centre) */}
-            <div style={styles.footerSection}>
-              <h3 style={styles.footerTitle}>Contact</h3>
-              <div style={styles.contactInfo}>
-                <a href="mailto:flybrary4@gmail.com" style={styles.contactLink}>
-                  <Mail size={18} />
-                  <span>flybrary4@gmail.com</span>
-                </a>
-                <a
-                  href="https://wa.me/22947809413?text=Bonjour%2C%20j'aimerais%20avoir%20acc%C3%A8s%20%C3%A0%20la%20biblioth%C3%A8que%20DigiLib"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ ...styles.contactLink, cursor: 'pointer' }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = '#25D366'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
-                >
-                  <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem' }} className='flex items-center gap-2'>
-                    <MessageCircleMore size={20} strokeWidth={2} />WhatsApp
-                  </span>
-                  </a>
-              </div>
-            </div>
-
-            {/* LIENS RAPIDES (Droite) */}
-            <div style={styles.footerSection}>
-              <h3 style={styles.footerTitle}>Liens Rapides</h3>
-              <div style={styles.faqLinks}>
+                <h3 className="mt-7 text-center font-display text-2xl text-[#24160f]">{book.title}</h3>
                 <button
-                  onClick={handleAccessLibrary}
-                  style={styles.faqLink}
+                  type="button"
+                  onClick={() => window.open(getDirectDownloadLink(book.drive_link), '_blank')}
+                  className="btn-library mt-4 bg-[#1a100c] text-[#f6efe4]"
                 >
-                  Accéder à la bibliothèque
+                  <Download size={14} />
+                  Télécharger
                 </button>
+              </article>
+            ))}
+          </div>
+          <div className="wood-shelf mt-10" />
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-5 pb-20 md:px-8">
+        <div className="gold-rule" />
+        <h2 className="mt-6 font-display text-4xl font-semibold text-[#24160f]">Questions fréquentes</h2>
+        <div className="mt-8 divide-y divide-[#24160f]/10">
+          {faqs.map((faq, i) => (
+            <div key={faq.question} className="py-4">
+              <button
+                type="button"
+                onClick={() => setOpenFAQ(openFAQ === i ? null : i)}
+                className="flex w-full items-center justify-between text-left font-display text-xl text-[#24160f]"
+              >
+                {faq.question}
+                <ChevronDown size={18} className={openFAQ === i ? 'rotate-180' : ''} />
+              </button>
+              <div className={`faq-answer ${openFAQ === i ? 'open' : ''}`}>
+                <div>
+                  <p className="pt-3 text-sm leading-7 text-[#6b5e52]">{faq.answer}</p>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* COPYRIGHT */}
-          <div style={styles.copyright}>
-            <p>© 2025 DigiLib. Tous droits réservés.</p>
-          </div>
-        </footer>
-      </div>
-    </div>
+          ))}
+        </div>
+      </section>
+    </PublicLayout>
   )
 }
-
-const styles = {
-  container: {
-    position: 'relative' as const,
-    minHeight: '100vh',
-    overflow: 'hidden',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    zIndex: 0,
-  },
-  video: {
-    position: 'absolute' as const,
-    width: '100%',
-    height: '100%',
-    top: 0,
-    left: 0,
-    objectFit: 'cover' as const,
-    opacity: 0.7,
-    zIndex: 0,
-    pointerEvents: 'none' as const,
-  },
-  content: {
-    position: 'relative' as const,
-    zIndex: 1,
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    background: 'linear-gradient(135deg, rgba(10, 56, 97, 0.5) 0%, rgba(0, 0, 0, 0.8) 100%)',
-  },
-  header: {
-    position: 'fixed' as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%)',
-    padding: 'clamp(0.75rem, 2vw, 1rem) clamp(1rem, 4vw, 3rem)',
-    zIndex: 100,
-  },
-  logo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem',
-    color: 'white',
-  },
-  logoText: {
-    fontSize: 'clamp(1.2rem, 3vw, 1.5rem)',
-    fontWeight: '700',
-    letterSpacing: '-0.5px',
-  },
-  adminBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    background: 'rgba(255,255,255,0.15)',
-    color: 'white',
-    padding: 'clamp(0.5rem, 2vw, 0.65rem) clamp(0.75rem, 3vw, 1.25rem)',
-    border: '1.5px solid rgba(255,255,255,0.3)',
-    borderRadius: '12px',
-    cursor: 'pointer',
-    fontWeight: '600',
-    fontSize: 'clamp(0.85rem, 2vw, 0.95rem)',
-    transition: 'all 0.3s ease',
-    backdropFilter: 'blur(10px)',
-  },
-  hero: {
-    flex: 1,
-    maxWidth: '1200px',
-    margin: '100px auto 0',
-    textAlign: 'center' as const,
-    color: 'white',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 'clamp(1rem, 4vw, 2rem)',
-  },
-  badge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    background: 'rgba(255,255,255,0.2)',
-    padding: '0.5rem 1rem',
-    borderRadius: '50px',
-    fontSize: 'clamp(0.75rem, 2vw, 0.85rem)',
-    fontWeight: '600',
-    letterSpacing: '0.5px',
-    marginBottom: '1.4rem',
-    border: '1px solid rgba(255,255,255,0.3)',
-    backdropFilter: 'blur(10px)',
-  },
-  title: {
-    fontSize: 'clamp(2rem, 6vw, 4.5rem)',
-    fontWeight: '800',
-    marginBottom: '1.5rem',
-    lineHeight: '1.1',
-    fontFamily: '"Itim',
-    letterSpacing: '-2px',
-    textShadow: '0 4px 20px rgba(0,0,0,0.2)',
-  },
-  subtitle: {
-    fontSize: 'clamp(1rem, 3vw, 1.4rem)',
-    marginBottom: '4rem',
-    opacity: 0.95,
-    fontWeight: '400',
-    lineHeight: '1.6',
-  },
-  features: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))',
-    gap: 'clamp(1rem, 3vw, 2rem)',
-    marginBottom: '3.5rem',
-    width: '100%',
-  },
-  feature: {
-    background: 'rgba(255,255,255,0.12)',
-    padding: 'clamp(1.5rem, 4vw, 2.5rem) clamp(1rem, 3vw, 2rem)',
-    borderRadius: '20px',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    transition: 'all 0.3s ease',
-    textAlign: 'left' as const,
-  },
-  iconWrapper: {
-    width: 'clamp(48px, 10vw, 64px)',
-    height: 'clamp(48px, 10vw, 64px)',
-    background: 'rgba(255,255,255,0.15)',
-    borderRadius: '16px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '1.5rem',
-    border: '1px solid rgba(255,255,255,0.2)',
-  },
-  featureTitle: {
-    fontSize: 'clamp(1.1rem, 3vw, 1.3rem)',
-    fontWeight: '700',
-    marginBottom: '1rem',
-    letterSpacing: '-0.5px',
-  },
-  featureDesc: {
-    fontSize: 'clamp(0.9rem, 2.5vw, 1rem)',
-    opacity: 0.9,
-    lineHeight: '1.7',
-    margin: 0,
-  },
-  ctaButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem',
-    background: 'white',
-    color: '#6366f1',
-    fontSize: 'clamp(1rem, 3vw, 1.2rem)',
-    fontWeight: '700',
-    padding: 'clamp(1rem, 3vw, 1.4rem) clamp(2rem, 6vw, 3.5rem)',
-    border: 'none',
-    borderRadius: '16px',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-    marginBottom: '4rem',
-  },
-
-  // SECTION LIVRES GRATUITS
-  freeBooksSection: {
-    width: '100%',
-    marginTop: '4rem',
-    marginBottom: '4rem',
-  },
-  freeBooksTitle: {
-    fontSize: 'clamp(1.8rem, 5vw, 2.5rem)',
-    fontWeight: '800',
-    marginBottom: '1rem',
-  },
-  freeBooksSubtitle: {
-    fontSize: 'clamp(1rem, 3vw, 1.2rem)',
-    opacity: 0.9,
-    marginBottom: '3rem',
-  },
-  freeBooksGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))',
-    gap: 'clamp(1.5rem, 4vw, 2.5rem)',
-    justifyItems: 'center',
-  },
-  freeBookCard: {
-    background: 'rgba(255,255,255,0.15)',
-    borderRadius: '15px',
-    overflow: 'hidden',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-    cursor: 'pointer',
-    width: '100%',
-    maxWidth: '280px',
-  },
-  freeBookCover: {
-    width: '100%',
-    height: 'clamp(280px, 35vw, 350px)',
-    objectFit: 'cover' as const,
-    backgroundColor: '#f0f0f0',
-  },
-  freeBookInfo: {
-    padding: 'clamp(1rem, 3vw, 1.5rem)',
-  },
-  freeBookTitle: {
-    fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)',
-    fontWeight: '700',
-    marginBottom: '0.5rem',
-    color: 'white',
-    minHeight: '2.5rem',
-    lineHeight: '1.3',
-  },
-  freeBookAuthor: {
-    fontSize: 'clamp(0.85rem, 2vw, 0.9rem)',
-    opacity: 0.8,
-    marginBottom: '1rem',
-    color: 'white',
-  },
-  downloadFreeButton: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.5rem',
-    width: '100%',
-    background: '#10b981',
-    color: 'white',
-    padding: '0.75rem',
-    border: 'none',
-    borderRadius: '10px',
-    cursor: 'pointer',
-    fontWeight: '600',
-    fontSize: 'clamp(0.85rem, 2vw, 0.95rem)',
-    transition: 'background 0.3s ease',
-  },
-
-  // SECTION FAQ
-  faqSection: {
-    width: '100%',
-    maxWidth: '800px',
-    marginTop: '4rem',
-    marginBottom: '4rem',
-  },
-  faqSectionTitle: {
-    fontSize: 'clamp(1.8rem, 5vw, 2.5rem)',
-    fontWeight: '800',
-    marginBottom: '1rem',
-  },
-  faqSectionSubtitle: {
-    fontSize: 'clamp(1rem, 3vw, 1.2rem)',
-    opacity: 0.9,
-    marginBottom: '3rem',
-  },
-  faqContainer: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '1rem',
-  },
-  faqItem: {
-    background: 'rgba(255,255,255,0.1)',
-    borderRadius: '15px',
-    overflow: 'hidden',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255,255,255,0.2)',
-  },
-  faqQuestion: {
-    width: '100%',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 'clamp(1rem, 3vw, 1.5rem)',
-    background: 'transparent',
-    border: 'none',
-    color: 'white',
-    fontSize: 'clamp(1rem, 2.5vw, 1.1rem)',
-    fontWeight: '600',
-    textAlign: 'left' as const,
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-  },
-  faqQuestionActive: {
-    background: 'rgba(255,255,255,0.05)',
-  },
-  faqAnswer: {
-    padding: '0 clamp(1rem, 3vw, 1.5rem) clamp(1rem, 3vw, 1.5rem)',
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 'clamp(0.9rem, 2.5vw, 1rem)',
-    lineHeight: '1.7',
-    animation: 'fadeIn 0.3s ease',
-  },
-
-  // FOOTER
-  footer: {
-    background: 'rgba(0,0,0,0.6)',
-    backdropFilter: 'blur(20px)',
-    borderTop: '1px solid rgba(255,255,255,0.1)',
-    padding: 'clamp(2rem, 5vw, 3rem) clamp(1rem, 3vw, 2rem) 1rem',
-    marginTop: 'auto',
-  },
-  footerContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(min(250px, 100%), 1fr))',
-    gap: 'clamp(2rem, 5vw, 3rem)',
-    marginBottom: '2rem',
-  },
-  footerSection: {
-    color: 'white',
-  },
-  footerTitle: {
-    fontSize: 'clamp(1.1rem, 3vw, 1.2rem)',
-    fontWeight: '700',
-    marginBottom: '1.5rem',
-  },
-  contactInfo: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '1rem',
-  },
-  contactLink: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem',
-    color: 'rgba(255,255,255,0.8)',
-    textDecoration: 'none',
-    transition: 'color 0.3s ease',
-    fontSize: 'clamp(0.85rem, 2vw, 0.95rem)',
-  },
-  faqLinks: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '0.75rem',
-  },
-  faqLink: {
-    background: 'none',
-    border: 'none',
-    color: 'rgba(255,255,255,0.8)',
-    textDecoration: 'none',
-    textAlign: 'left' as const,
-    cursor: 'pointer',
-    transition: 'color 0.3s ease',
-    fontSize: 'clamp(0.85rem, 2vw, 0.95rem)',
-    padding: 0,
-  },
-  footerLogo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '1rem',
-    marginBottom: '1rem',
-  },
-  footerLogoText: {
-    fontSize: 'clamp(1.5rem, 4vw, 2rem)',
-    fontWeight: '700',
-  },
-  footerTagline: {
-    fontSize: 'clamp(0.85rem, 2vw, 0.9rem)',
-    opacity: 0.7,
-    margin: 0,
-  },
-  copyright: {
-    textAlign: 'center' as const,
-    paddingTop: '2rem',
-    borderTop: '1px solid rgba(255,255,255,0.1)',
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 'clamp(0.8rem, 2vw, 0.9rem)',
-  },
-}
-
-// Animation CSS
-const styleSheet = document.createElement('style')
-styleSheet.textContent = `
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-`
-document.head.appendChild(styleSheet)

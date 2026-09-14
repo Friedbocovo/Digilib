@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
-import { Book, LucideIcon } from 'lucide-react'
+import { getDirectImageUrl } from '../lib/drive'
+import { uploadCategoryImage, uploadBookCover } from '../lib/uploadImage'
 import {
   Settings,
   LogOut,
@@ -16,11 +17,13 @@ import {
   Plus,
   Edit2,
   Trash2,
+  Upload,
   Eye,
   Download,
   Phone,
   Mail,
-  Calendar
+  Calendar,
+  X,
 } from 'lucide-react'
 
 interface Category {
@@ -29,7 +32,16 @@ interface Category {
   description?: string
   color: string
   icon: string
+  image_url?: string
   created_at: string
+}
+
+const emptyCategoryForm = {
+  name: '',
+  description: '',
+  color: '#d4a574',
+  icon: '📚',
+  image_url: '',
 }
 
 interface Book {
@@ -50,6 +62,20 @@ interface Book {
   created_at: string
 }
 
+const emptyBookForm = {
+  title: '',
+  author: '',
+  description: '',
+  cover_url: '',
+  drive_link: '',
+  drive_file_id: '',
+  category_id: '',
+  file_size: '',
+  pages: '',
+  language: '',
+  published_year: '',
+}
+
 interface Payment {
   id: number
   user_id?: string
@@ -62,6 +88,7 @@ interface Payment {
   created_at: string
   users?: {
     name: string
+    city?: string
   }
 }
 
@@ -72,44 +99,6 @@ interface User {
   phone_number: string
   city?: string
   created_at: string
-}
-
-const IconMap: { [key: string]: LucideIcon } = {
-  Book: Book,
-}
-
-const getLucideIcon = (iconName: string, size = 20, color = 'white') => {
-  const IconComponent = IconMap[iconName]
-  if (IconComponent) {
-    return <IconComponent size={size} color={color} />
-  }
-  return <Book size={size} color={color} />
-}
-
-const getDirectImageUrl = (url: string): string => {
-  if (!url) return 'https://via.placeholder.com/150x200/667eea/ffffff?text=Livre'
-
-  if (url.includes('drive.google.com/uc?export=view&id=')) {
-    return url
-  }
-
-  let fileId = ''
-
-  if (url.includes('/file/d/')) {
-    const match = url.match(/\/file\/d\/([^\/]+)/)
-    if (match) fileId = match[1]
-  } else if (url.includes('id=')) {
-    const match = url.match(/id=([^&]+)/)
-    if (match) fileId = match[1]
-  } else if (url.length > 20 && !url.includes('/')) {
-    fileId = url
-  }
-
-  if (fileId) {
-    return `https://drive.google.com/uc?export=view&id=${fileId}`
-  }
-
-  return url || 'https://via.placeholder.com/150x200/667eea/ffffff?text=Livre'
 }
 
 export default function AdminPage() {
@@ -127,36 +116,32 @@ export default function AdminPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [editingBook, setEditingBook] = useState<Book | null>(null)
 
-  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', color: '#667eea', icon: 'Book' })
-  const [bookForm, setBookForm] = useState({
-    title: '',
-    author: '',
-    description: '',
-    cover_url: '',
-    drive_link: '',
-    drive_file_id: '',
-    category_id: '',
-    file_size: '',
-    pages: '',
-    language: '',
-    published_year: ''
-  })
+  const [categoryForm, setCategoryForm] = useState(emptyCategoryForm)
+  const [categoryImageFile, setCategoryImageFile] = useState<File | null>(null)
+  const [categoryImagePreview, setCategoryImagePreview] = useState('')
+  const [savingCategory, setSavingCategory] = useState(false)
+  const [bookForm, setBookForm] = useState(emptyBookForm)
+  const [bookCoverFile, setBookCoverFile] = useState<File | null>(null)
+  const [bookCoverPreview, setBookCoverPreview] = useState('')
+  const [savingBook, setSavingBook] = useState(false)
 
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalRevenue: 0,
     completedPayments: 0,
-    pendingPayments: 0
+    pendingPayments: 0,
   })
 
   useEffect(() => {
     checkAdminAccess()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     if (activeTab === 'categories') loadCategories()
     else if (activeTab === 'books') loadBooks()
     else if (activeTab === 'payments') loadPayments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
   const checkAdminAccess = async () => {
@@ -171,11 +156,7 @@ export default function AdminPage() {
   const loadCategories = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name')
-
+      const { data, error } = await supabase.from('categories').select('*').order('name')
       if (error) throw error
       setCategories(data || [])
     } catch (error) {
@@ -189,11 +170,7 @@ export default function AdminPage() {
   const loadBooks = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('books')
-        .select('*')
-        .order('created_at', { ascending: false })
-
+      const { data, error } = await supabase.from('books').select('*').order('created_at', { ascending: false })
       if (error) throw error
       setBooks(data || [])
     } catch (error) {
@@ -209,37 +186,27 @@ export default function AdminPage() {
     try {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
-        .select(`
-          *,
-          users (
-            name
-          )
-        `)
+        .select(`*, users ( name, city )`)
         .order('created_at', { ascending: false })
 
       if (paymentsError) throw paymentsError
 
       setPayments(paymentsData || [])
 
-      const completed = paymentsData?.filter(p => p.status === 'completed') || []
-      const pending = paymentsData?.filter(p => p.status === 'pending') || []
+      const completed = paymentsData?.filter((p) => p.status === 'completed') || []
+      const pending = paymentsData?.filter((p) => p.status === 'pending') || []
       const totalRevenue = completed.reduce((sum, p) => sum + Number(p.amount), 0)
-      const uniqueUsers = new Set(completed.map(p => p.user_email))
+      const uniqueUsers = new Set(completed.map((p) => p.user_email))
 
       setStats({
         totalUsers: uniqueUsers.size,
         totalRevenue,
         completedPayments: completed.length,
-        pendingPayments: pending.length
+        pendingPayments: pending.length,
       })
 
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false })
-
+      const { data: usersData } = await supabase.from('users').select('*').order('created_at', { ascending: false })
       setUsers(usersData || [])
-
     } catch (error) {
       console.error('Error loading payments:', error)
       setPopup({ message: 'Erreur de chargement des paiements', type: 'error' })
@@ -248,38 +215,90 @@ export default function AdminPage() {
     }
   }
 
+  const resetCategoryModal = () => {
+    setShowCategoryModal(false)
+    setEditingCategory(null)
+    setCategoryForm(emptyCategoryForm)
+    setCategoryImageFile(null)
+    setCategoryImagePreview('')
+  }
+
+  const handleCategoryImagePick = (file?: File) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setPopup({ message: 'Choisissez une image (JPG, PNG, WebP)', type: 'error' })
+      return
+    }
+    setCategoryImageFile(file)
+    setCategoryImagePreview(URL.createObjectURL(file))
+  }
+
+  const resetBookModal = () => {
+    setShowBookModal(false)
+    setEditingBook(null)
+    setBookForm(emptyBookForm)
+    setBookCoverFile(null)
+    setBookCoverPreview('')
+  }
+
   const handleSaveCategory = async () => {
-    if (!categoryForm.name || !categoryForm.color) {
-      setPopup({ message: 'Veuillez remplir tous les champs', type: 'error' })
+    if (!categoryForm.name) {
+      setPopup({ message: 'Donnez un nom à la catégorie', type: 'error' })
       return
     }
 
+    if (!editingCategory && !categoryForm.image_url && !categoryImageFile) {
+      setPopup({ message: 'Ajoutez une image : lien Drive ou fichier', type: 'error' })
+      return
+    }
+
+    setSavingCategory(true)
     try {
-      if (editingCategory) {
-        const { error } = await supabase
-          .from('categories')
-          .update(categoryForm)
-          .eq('id', editingCategory.id)
+      const image_url = categoryImageFile ? await uploadCategoryImage(categoryImageFile) : categoryForm.image_url
 
-        if (error) throw error
-        setPopup({ message: 'Catégorie modifiée avec succès', type: 'success' })
+      const payload = { ...categoryForm, image_url }
+      const saved = editingCategory
+        ? await supabase.from('categories').update(payload).eq('id', editingCategory.id)
+        : await supabase.from('categories').insert([payload])
+
+      if (saved.error && /image_url|column/i.test(saved.error.message)) {
+        const { image_url: _image, ...withoutImage } = payload
+        const retry = editingCategory
+          ? await supabase.from('categories').update(withoutImage).eq('id', editingCategory.id)
+          : await supabase.from('categories').insert([withoutImage])
+        if (retry.error) throw retry.error
+        setPopup({
+          message: 'Catégorie enregistrée. Ajoutez la colonne image_url dans Supabase pour garder la photo.',
+          type: 'info',
+        })
+      } else if (saved.error) {
+        throw saved.error
       } else {
-        const { error } = await supabase
-          .from('categories')
-          .insert([categoryForm])
-
-        if (error) throw error
-        setPopup({ message: 'Catégorie créée avec succès', type: 'success' })
+        setPopup({
+          message: editingCategory ? 'Catégorie modifiée avec succès' : 'Catégorie créée avec succès',
+          type: 'success',
+        })
       }
 
-      setShowCategoryModal(false)
-      setEditingCategory(null)
-      setCategoryForm({ name: '', description: '', color: '#667eea', icon: 'Book' })
+      resetCategoryModal()
       loadCategories()
     } catch (error) {
       console.error('Error saving category:', error)
-      setPopup({ message: 'Erreur lors de la sauvegarde', type: 'error' })
+      const message = error instanceof Error ? error.message : 'Erreur lors de la sauvegarde'
+      setPopup({ message, type: 'error' })
+    } finally {
+      setSavingCategory(false)
     }
+  }
+
+  const handleBookCoverPick = (file?: File) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setPopup({ message: 'Choisissez une image (JPG, PNG, WebP)', type: 'error' })
+      return
+    }
+    setBookCoverFile(file)
+    setBookCoverPreview(URL.createObjectURL(file))
   }
 
   const handleSaveBook = async () => {
@@ -288,63 +307,48 @@ export default function AdminPage() {
       return
     }
 
+    setSavingBook(true)
     try {
+      const cover_url = bookCoverFile ? await uploadBookCover(bookCoverFile) : bookForm.cover_url
+
       const bookData = {
         ...bookForm,
+        cover_url,
         pages: bookForm.pages ? parseInt(bookForm.pages) : null,
         published_year: bookForm.published_year ? parseInt(bookForm.published_year) : null,
         downloads: 0,
-        views: 0
+        views: 0,
       }
 
       if (editingBook) {
-        const { error } = await supabase
-          .from('books')
-          .update(bookData)
-          .eq('id', editingBook.id)
-
+        const { error } = await supabase.from('books').update(bookData).eq('id', editingBook.id)
         if (error) throw error
         setPopup({ message: 'Livre modifié avec succès', type: 'success' })
       } else {
-        const { error } = await supabase
-          .from('books')
-          .insert([bookData])
-
+        const { error } = await supabase.from('books').insert([bookData])
         if (error) throw error
         setPopup({ message: 'Livre ajouté avec succès', type: 'success' })
       }
 
       setShowBookModal(false)
       setEditingBook(null)
-      setBookForm({
-        title: '',
-        author: '',
-        description: '',
-        cover_url: '',
-        drive_link: '',
-        drive_file_id: '',
-        category_id: '',
-        file_size: '',
-        pages: '',
-        language: '',
-        published_year: ''
-      })
+      setBookForm(emptyBookForm)
+      setBookCoverFile(null)
+      setBookCoverPreview('')
       loadBooks()
     } catch (error) {
       console.error('Error saving book:', error)
-      setPopup({ message: 'Erreur lors de la sauvegarde', type: 'error' })
+      const message = error instanceof Error ? error.message : 'Erreur lors de la sauvegarde'
+      setPopup({ message, type: 'error' })
+    } finally {
+      setSavingBook(false)
     }
   }
 
   const handleDeleteCategory = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette catégorie ?')) return
-
     try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', id)
-
+      const { error } = await supabase.from('categories').delete().eq('id', id)
       if (error) throw error
       setPopup({ message: 'Catégorie supprimée', type: 'success' })
       loadCategories()
@@ -356,13 +360,8 @@ export default function AdminPage() {
 
   const handleDeleteBook = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce livre ?')) return
-
     try {
-      const { error } = await supabase
-        .from('books')
-        .delete()
-        .eq('id', id)
-
+      const { error } = await supabase.from('books').delete().eq('id', id)
       if (error) throw error
       setPopup({ message: 'Livre supprimé', type: 'success' })
       loadBooks()
@@ -377,172 +376,139 @@ export default function AdminPage() {
     navigate('/admin-login')
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('fr-FR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     })
-  }
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR').format(amount) + ' XAF'
-  }
+  const formatAmount = (amount: number) => new Intl.NumberFormat('fr-FR').format(amount) + ' XOF'
+
+  const statCards = [
+    { label: 'Utilisateurs payants', value: stats.totalUsers.toString(), icon: Users },
+    { label: 'Revenus totaux', value: formatAmount(stats.totalRevenue), icon: DollarSign },
+    { label: 'Paiements réussis', value: stats.completedPayments.toString(), icon: CheckCircle },
+    { label: 'Paiements en attente', value: stats.pendingPayments.toString(), icon: Clock },
+  ]
 
   return (
-    <div style={styles.container}>
+    <div className="theme-salle min-h-screen bg-ink">
       {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
 
-      <header style={styles.header}>
-        <h1 style={styles.logo}>
-          <Settings size={28} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-          <span className="md:flex hidden "> Admin Dashboard</span> <span className="md:hidden flex text-2xl  "> Admin D...</span>
-
-        </h1>
-        <button onClick={handleLogout} style={styles.logoutButton}>
-          <LogOut size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-          <span className="md:flex hidden">Déconnexion</span>
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gold/15 bg-[#150f0c]/95 px-4 py-4 backdrop-blur sm:px-6">
+        <div className="flex items-center gap-2.5">
+          <Settings size={22} className="text-gold" />
+          <span className="font-display text-lg font-semibold text-parchment sm:text-xl">Admin DigiLib</span>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="btn-library border border-[#e86b6b]/40 text-[#e86b6b] hover:bg-[#e86b6b]/10"
+        >
+          <LogOut size={16} />
+          <span className="hidden sm:inline">Déconnexion</span>
         </button>
       </header>
 
-      <div style={styles.content}>
-        <div style={styles.statsGrid}>
-          <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-            <Users size={40} style={{ marginBottom: '0.5rem' }} />
-            <div style={styles.statValue}>{stats.totalUsers}</div>
-            <div style={styles.statLabel}>Utilisateurs payants</div>
-          </div>
-
-          <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
-            <DollarSign size={40} style={{ marginBottom: '0.5rem' }} />
-            <div style={styles.statValue}>{formatAmount(stats.totalRevenue)}</div>
-            <div style={styles.statLabel}>Revenus totaux</div>
-          </div>
-
-          <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' }}>
-            <CheckCircle size={40} style={{ marginBottom: '0.5rem' }} />
-            <div style={styles.statValue}>{stats.completedPayments}</div>
-            <div style={styles.statLabel}>Paiements réussis</div>
-          </div>
-
-          <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}>
-            <Clock size={40} style={{ marginBottom: '0.5rem' }} />
-            <div style={styles.statValue}>{stats.pendingPayments}</div>
-            <div style={styles.statLabel}>Paiements en attente</div>
-          </div>
+      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {statCards.map((card) => (
+            <div key={card.label} className="rounded-xl border border-gold/15 bg-[#1c1410] p-5">
+              <card.icon size={26} className="text-gold" />
+              <div className="mt-3 font-display text-2xl font-semibold text-parchment">{card.value}</div>
+              <div className="mt-1 text-xs uppercase tracking-[0.1em] text-muted">{card.label}</div>
+            </div>
+          ))}
         </div>
 
-        <div style={styles.tabs} className="md:flex grid">
-          <button
-            onClick={() => setActiveTab('payments')}
-            style={{
-              ...styles.tab,
-              ...(activeTab === 'payments' ? styles.activeTab : {})
-            }}
-          >
-            <CreditCard size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-            Paiements ({payments.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('categories')}
-            style={{
-              ...styles.tab,
-              ...(activeTab === 'categories' ? styles.activeTab : {})
-            }}
-          >
-            <FolderOpen size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-            Catégories ({categories.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('books')}
-            style={{
-              ...styles.tab,
-              ...(activeTab === 'books' ? styles.activeTab : {})
-            }}
-          >
-            <BookOpen size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-            Livres ({books.length})
-          </button>
+        <div className="mt-6 grid grid-cols-3 gap-2 rounded-full border border-gold/20 bg-[#1c1410] p-1.5">
+          {[
+            { key: 'payments' as const, label: `Paiements (${payments.length})`, icon: CreditCard },
+            { key: 'categories' as const, label: `Catégories (${categories.length})`, icon: FolderOpen },
+            { key: 'books' as const, label: `Livres (${books.length})`, icon: BookOpen },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] transition sm:text-xs ${
+                activeTab === tab.key ? 'bg-gold text-ink' : 'text-muted hover:text-parchment'
+              }`}
+            >
+              <tab.icon size={15} />
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          ))}
         </div>
 
-        <div style={styles.tabContent}>
+        <div className="mt-6 rounded-xl border border-gold/15 bg-[#1c1410] p-4 sm:p-6">
           {loading ? (
-            <div style={styles.loading}>Chargement...</div>
+            <div className="py-16 text-center text-muted">Chargement...</div>
           ) : (
             <>
               {activeTab === 'payments' && (
                 <div>
-                  <h2 style={styles.sectionTitle}>Liste des paiements</h2>
+                  <h2 className="font-display text-2xl font-semibold text-parchment">Liste des paiements</h2>
 
                   {payments.length === 0 ? (
-                    <p style={styles.emptyMessage}>Aucun paiement pour le moment</p>
+                    <p className="py-12 text-center text-muted">Aucun paiement pour le moment</p>
                   ) : (
-                    <div style={styles.tableContainer}>
-                      <table style={styles.table}>
+                    <div className="mt-5 overflow-x-auto">
+                      <table className="w-full min-w-[860px] border-collapse text-sm">
                         <thead>
-                          <tr>
-                            <th style={styles.th}>Date</th>
-                            <th style={styles.th}>Nom</th>
-                            <th style={styles.th}>Email</th>
-                            <th style={styles.th}>Téléphone</th>
-                            <th style={styles.th}>Ville</th>
-                            <th style={styles.th}>Montant</th>
-                            <th style={styles.th}>Méthode</th>
-                            <th style={styles.th}>Statut</th>
-                            <th style={styles.th}>Transaction ID</th>
+                          <tr className="border-b border-gold/15 text-left text-[11px] uppercase tracking-[0.1em] text-gold">
+                            <th className="px-3 py-3">Date</th>
+                            <th className="px-3 py-3">Nom</th>
+                            <th className="px-3 py-3">Email</th>
+                            <th className="px-3 py-3">Téléphone</th>
+                            <th className="px-3 py-3">Ville</th>
+                            <th className="px-3 py-3">Montant</th>
+                            <th className="px-3 py-3">Méthode</th>
+                            <th className="px-3 py-3">Statut</th>
+                            <th className="px-3 py-3">Transaction</th>
                           </tr>
                         </thead>
                         <tbody>
                           {payments.map((payment) => (
-                            <tr key={payment.id} style={styles.tr}>
-                              <td style={styles.td}>
-                                <Calendar size={14} style={{ marginRight: '0.5rem', verticalAlign: 'middle', color: '#999' }} />
+                            <tr key={payment.id} className="border-b border-gold/10 text-parchment/85">
+                              <td className="px-3 py-3 whitespace-nowrap">
+                                <Calendar size={13} className="mr-1.5 inline-block text-muted" />
                                 {formatDate(payment.created_at)}
                               </td>
-                              <td style={styles.td}>
-                                <strong>{payment.users?.name || 'N/A'}</strong>
-                              </td>
-                              <td style={styles.td}>
-                                <Mail size={14} style={{ marginRight: '0.5rem', verticalAlign: 'middle', color: '#999' }} />
+                              <td className="px-3 py-3 font-semibold">{payment.users?.name || 'N/A'}</td>
+                              <td className="px-3 py-3">
+                                <Mail size={13} className="mr-1.5 inline-block text-muted" />
                                 {payment.user_email}
                               </td>
-                              <td style={styles.td}>
-                                <Phone size={14} style={{ marginRight: '0.5rem', verticalAlign: 'middle', color: '#999' }} />
+                              <td className="px-3 py-3 whitespace-nowrap">
+                                <Phone size={13} className="mr-1.5 inline-block text-muted" />
                                 {payment.phone_number}
                               </td>
-                              <td style={styles.td}>  {/* ← NOUVEAU */}
-                                {payment.users?.city || payment.city || 'Non renseignée'}
-                              </td>
-                              <td style={styles.td}>
-                                <strong>{formatAmount(payment.amount)}</strong>
-                              </td>
-                              <td style={styles.td}>
-                                <span style={styles.methodBadge}>
+                              <td className="px-3 py-3">{payment.users?.city || 'Non renseignée'}</td>
+                              <td className="px-3 py-3 font-semibold">{formatAmount(payment.amount)}</td>
+                              <td className="px-3 py-3">
+                                <span className="rounded-full bg-gold/15 px-3 py-1 text-xs font-semibold text-gold">
                                   {payment.payment_method}
                                 </span>
                               </td>
-                              <td style={styles.td}>
-                                <span style={{
-                                  ...styles.statusBadge,
-                                  ...(payment.status === 'completed'
-                                    ? styles.statusCompleted
-                                    : payment.status === 'pending'
-                                      ? styles.statusPending
-                                      : styles.statusFailed)
-                                }}>
-                                  {payment.status === 'completed' && <CheckCircle size={14} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />}
-                                  {payment.status === 'pending' && <Clock size={14} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />}
-                                  {payment.status === 'completed' ? 'Réussi' :
-                                    payment.status === 'pending' ? 'En attente' :
-                                      'Échoué'}
+                              <td className="px-3 py-3">
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
+                                    payment.status === 'completed'
+                                      ? 'bg-[#3dcf8e]/15 text-[#3dcf8e]'
+                                      : payment.status === 'pending'
+                                        ? 'bg-[#efc792]/15 text-[#efc792]'
+                                        : 'bg-[#e86b6b]/15 text-[#e86b6b]'
+                                  }`}
+                                >
+                                  {payment.status === 'completed' && <CheckCircle size={12} />}
+                                  {payment.status === 'pending' && <Clock size={12} />}
+                                  {payment.status === 'completed' ? 'Réussi' : payment.status === 'pending' ? 'En attente' : 'Échoué'}
                                 </span>
                               </td>
-                              <td style={styles.td}>
-                                <small style={{ color: '#999', fontFamily: 'monospace' }}>
-                                  {payment.transaction_id || '-'}
-                                </small>
+                              <td className="px-3 py-3">
+                                <span className="font-mono text-xs text-muted">{payment.transaction_id || '-'}</span>
                               </td>
                             </tr>
                           ))}
@@ -551,35 +517,30 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  <h2 style={{ ...styles.sectionTitle, marginTop: '3rem' }}>
+                  <h2 className="mt-12 font-display text-2xl font-semibold text-parchment">
                     Utilisateurs inscrits ({users.length})
                   </h2>
 
                   {users.length === 0 ? (
-                    <p style={styles.emptyMessage}>Aucun utilisateur inscrit</p>
+                    <p className="py-12 text-center text-muted">Aucun utilisateur inscrit</p>
                   ) : (
-                    <div style={styles.usersGrid}>
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {users.map((user) => (
-                        <div key={user.id} style={styles.userCard}>
-                          <div style={styles.userAvatar}>
-                            {user.name.charAt(0).toUpperCase()}
+                        <div key={user.id} className="flex gap-4 rounded-xl border border-gold/10 bg-[#150f0c] p-4">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gold font-display text-lg font-semibold text-ink">
+                            {user.name?.charAt(0).toUpperCase() || '?'}
                           </div>
-                          <div style={styles.userInfo}>
-                            <h3 style={styles.userName}>{user.name}</h3>
-                            <p style={styles.userEmail}>
-                              <Mail size={14} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />
-                              {user.email}
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate font-display text-base text-parchment">{user.name}</h3>
+                            <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-muted">
+                              <Mail size={12} /> {user.email}
                             </p>
-                            <p style={styles.userPhone}>
-                              <Phone size={14} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />
-                              {user.phone_number}
+                            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                              <Phone size={12} /> {user.phone_number}
                             </p>
-                            <p style={styles.userCity}>  {/* ← NOUVEAU */}
-                              {user.city || 'Ville non renseignée'}
-                            </p>
-                            <p style={styles.userDate}>
-                              <Calendar size={14} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />
-                              Inscrit le {formatDate(user.created_at)}
+                            <p className="mt-1 text-xs text-muted">{user.city || 'Ville non renseignée'}</p>
+                            <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted/70">
+                              <Calendar size={11} /> Inscrit le {formatDate(user.created_at)}
                             </p>
                           </div>
                         </div>
@@ -591,30 +552,42 @@ export default function AdminPage() {
 
               {activeTab === 'categories' && (
                 <div>
-                  <div style={styles.sectionHeader}>
-                    <h2 style={styles.sectionTitle}>Catégories</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-display text-2xl font-semibold text-parchment">Catégories</h2>
                     <button
                       onClick={() => {
                         setEditingCategory(null)
-                        setCategoryForm({ name: '', description: '', color: '#667eea', icon: 'Book' })
+                        setCategoryForm(emptyCategoryForm)
+                        setCategoryImageFile(null)
+                        setCategoryImagePreview('')
                         setShowCategoryModal(true)
                       }}
-                      style={styles.addButton}
+                      className="btn-library bg-gold text-ink"
                     >
-                      <Plus size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                      <span className='md:flex hidden'>Nouvelle catégorie</span>
+                      <Plus size={16} />
+                      <span className="hidden sm:inline">Nouvelle catégorie</span>
                     </button>
                   </div>
 
-                  <div style={styles.grid}>
+                  <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     {categories.map((category) => (
-                      <div key={category.id} style={styles.categoryCard}>
-                        <div style={{ ...styles.categoryIcon, background: category.color }}>
+                      <div key={category.id} className="rounded-xl border border-gold/10 bg-[#150f0c] p-4 text-center">
+                        {category.image_url && (
+                          <img
+                            src={getDirectImageUrl(category.image_url)}
+                            alt={category.name}
+                            className="mb-3 h-28 w-full rounded-lg object-cover"
+                          />
+                        )}
+                        <div
+                          className="mx-auto flex h-16 w-16 items-center justify-center rounded-full text-2xl"
+                          style={{ background: category.color }}
+                        >
                           {category.icon}
                         </div>
-                        <h3 style={styles.categoryName}>{category.name}</h3>
-                        <p style={styles.categoryDesc}>{category.description}</p>
-                        <div style={styles.cardActions}>
+                        <h3 className="mt-3 font-display text-lg text-parchment">{category.name}</h3>
+                        <p className="mt-1 min-h-[2.5rem] text-sm text-muted">{category.description}</p>
+                        <div className="mt-4 flex justify-center gap-2">
                           <button
                             onClick={() => {
                               setEditingCategory(category)
@@ -622,21 +595,22 @@ export default function AdminPage() {
                                 name: category.name,
                                 description: category.description || '',
                                 color: category.color,
-                                icon: category.icon
+                                icon: category.icon,
+                                image_url: category.image_url || '',
                               })
+                              setCategoryImageFile(null)
+                              setCategoryImagePreview('')
                               setShowCategoryModal(true)
                             }}
-                            style={styles.editButton}
+                            className="btn-library border border-gold/30 text-parchment"
                           >
-                            <Edit2 size={16} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />
-                            Modifier
+                            <Edit2 size={14} /> Modifier
                           </button>
                           <button
                             onClick={() => handleDeleteCategory(category.id)}
-                            style={styles.deleteButton}
+                            className="btn-library border border-[#e86b6b]/40 text-[#e86b6b]"
                           >
-                            <Trash2 size={16} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />
-                            Supprimer
+                            <Trash2 size={14} /> Supprimer
                           </button>
                         </div>
                       </div>
@@ -647,58 +621,46 @@ export default function AdminPage() {
 
               {activeTab === 'books' && (
                 <div>
-                  <div style={styles.sectionHeader}>
-                    <h2 style={styles.sectionTitle}>Livres</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-display text-2xl font-semibold text-parchment">Livres</h2>
                     <button
                       onClick={() => {
                         setEditingBook(null)
-                        setBookForm({
-                          title: '',
-                          author: '',
-                          description: '',
-                          cover_url: '',
-                          drive_link: '',
-                          drive_file_id: '',
-                          category_id: '',
-                          file_size: '',
-                          pages: '',
-                          language: '',
-                          published_year: ''
-                        })
+                        setBookForm(emptyBookForm)
+                        setBookCoverFile(null)
+                        setBookCoverPreview('')
                         setShowBookModal(true)
                       }}
-                      style={styles.addButton}
+                      className="btn-library bg-gold text-ink"
                     >
-                      <Plus size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                      Nouveau livre
+                      <Plus size={16} />
+                      <span className="hidden sm:inline">Nouveau livre</span>
                     </button>
                   </div>
 
-                  <div style={styles.grid}>
+                  <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                     {books.map((book) => (
-                      <div key={book.id} style={styles.bookCard}>
+                      <div key={book.id} className="overflow-hidden rounded-xl border border-gold/10 bg-[#150f0c]">
                         <img
                           src={getDirectImageUrl(book.cover_url)}
                           alt={book.title}
-                          style={styles.bookCover}
+                          className="h-48 w-full bg-[#1c1410] object-cover"
                           onError={(e) => {
-                            e.currentTarget.src = 'https://via.placeholder.com/150x200/667eea/ffffff?text=Livre'
+                            e.currentTarget.src = 'https://placehold.co/300x400/1b1713/e8d8be?text=Livre'
                           }}
                         />
-                        <div style={styles.bookInfo}>
-                          <h3 style={styles.bookTitle}>{book.title}</h3>
-                          {book.author && <p style={styles.bookAuthor}>{book.author}</p>}
-                          <div style={styles.bookStats}>
-                            <span>
-                              <Eye size={14} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />
-                              {book.views}
+                        <div className="p-4">
+                          <h3 className="truncate font-display text-base text-parchment">{book.title}</h3>
+                          {book.author && <p className="mt-1 truncate text-sm text-muted">{book.author}</p>}
+                          <div className="mt-3 flex gap-4 text-xs text-muted">
+                            <span className="flex items-center gap-1">
+                              <Eye size={13} /> {book.views}
                             </span>
-                            <span>
-                              <Download size={14} style={{ marginRight: '0.3rem', verticalAlign: 'middle' }} />
-                              {book.downloads}
+                            <span className="flex items-center gap-1">
+                              <Download size={13} /> {book.downloads}
                             </span>
                           </div>
-                          <div style={styles.cardActions}>
+                          <div className="mt-4 flex gap-2">
                             <button
                               onClick={() => {
                                 setEditingBook(book)
@@ -713,19 +675,21 @@ export default function AdminPage() {
                                   file_size: book.file_size || '',
                                   pages: book.pages?.toString() || '',
                                   language: book.language || '',
-                                  published_year: book.published_year?.toString() || ''
+                                  published_year: book.published_year?.toString() || '',
                                 })
+                                setBookCoverFile(null)
+                                setBookCoverPreview('')
                                 setShowBookModal(true)
                               }}
-                              style={styles.editButton}
+                              className="btn-library flex-1 border border-gold/30 text-parchment"
                             >
-                              <Edit2 size={16} />
+                              <Edit2 size={14} />
                             </button>
                             <button
                               onClick={() => handleDeleteBook(book.id)}
-                              style={styles.deleteButton}
+                              className="btn-library flex-1 border border-[#e86b6b]/40 text-[#e86b6b]"
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </div>
@@ -740,52 +704,103 @@ export default function AdminPage() {
       </div>
 
       {showCategoryModal && (
-        <div style={styles.modal} onClick={() => setShowCategoryModal(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h2 style={styles.modalTitle}>
-              {editingCategory ? 'Modifier la catégorie' : 'Nouvelle catégorie'}
-            </h2>
-            <form onSubmit={(e) => { e.preventDefault(); handleSaveCategory(); }} style={styles.form}>
-              <label style={styles.label}>Nom</label>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={resetCategoryModal}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-gold/15 bg-[#1c1410] p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-xl font-semibold text-parchment">
+                {editingCategory ? 'Modifier la catégorie' : 'Nouvelle catégorie'}
+              </h2>
+              <button onClick={resetCategoryModal} className="text-muted hover:text-parchment">
+                <X size={20} />
+              </button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleSaveCategory()
+              }}
+              className="mt-5 flex flex-col gap-3"
+            >
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Nom</label>
               <input
                 type="text"
                 value={categoryForm.name}
                 onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                style={styles.input}
+                className="field"
                 required
               />
 
-              <label style={styles.label}>Description</label>
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Description</label>
               <textarea
                 value={categoryForm.description}
                 onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
-                style={styles.textarea}
+                className="field"
                 rows={3}
               />
 
-              <label style={styles.label}>Icône (emoji)</label>
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Icône (emoji)</label>
               <input
                 type="text"
                 value={categoryForm.icon}
                 onChange={(e) => setCategoryForm({ ...categoryForm, icon: e.target.value })}
-                style={styles.input}
+                className="field"
                 placeholder="📚"
               />
 
-              <label style={styles.label}>Couleur</label>
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Image de la catégorie</label>
+              <input
+                type="text"
+                value={categoryForm.image_url}
+                onChange={(e) => {
+                  setCategoryImageFile(null)
+                  setCategoryImagePreview('')
+                  setCategoryForm({ ...categoryForm, image_url: e.target.value })
+                }}
+                className="field"
+                placeholder="Lien Google Drive (comme pour les couvertures)"
+              />
+              <label className="mt-1 flex cursor-pointer items-center gap-2 text-sm text-gold">
+                <Upload size={16} />
+                Ou uploader une image
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleCategoryImagePick(e.target.files?.[0])}
+                />
+              </label>
+              {(categoryImagePreview || categoryForm.image_url) && (
+                <img
+                  src={categoryImagePreview || getDirectImageUrl(categoryForm.image_url)}
+                  alt="Aperçu"
+                  className="mt-1 h-40 w-full rounded-lg object-cover"
+                />
+              )}
+
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Couleur</label>
               <input
                 type="color"
                 value={categoryForm.color}
                 onChange={(e) => setCategoryForm({ ...categoryForm, color: e.target.value })}
-                style={styles.colorInput}
+                className="h-12 w-full cursor-pointer rounded-lg border border-gold/20 bg-transparent p-1"
               />
 
-              <div style={styles.modalActions}>
-                <button type="button" onClick={() => setShowCategoryModal(false)} style={styles.cancelButton}>
+              <div className="mt-3 flex justify-end gap-3">
+                <button type="button" onClick={resetCategoryModal} className="btn-library border border-gold/20 text-muted">
                   Annuler
                 </button>
-                <button type="submit" style={styles.saveButton}>
-                  Enregistrer
+                <button
+                  type="submit"
+                  disabled={savingCategory}
+                  className="btn-library bg-gold text-ink disabled:opacity-60"
+                >
+                  {savingCategory ? 'Enregistrement…' : 'Enregistrer'}
                 </button>
               </div>
             </form>
@@ -794,131 +809,173 @@ export default function AdminPage() {
       )}
 
       {showBookModal && (
-        <div style={styles.modal} onClick={() => setShowBookModal(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h2 style={styles.modalTitle}>
-              {editingBook ? 'Modifier le livre' : 'Nouveau livre'}
-            </h2>
-            <form onSubmit={(e) => { e.preventDefault(); handleSaveBook(); }} style={styles.form}>
-              <label style={styles.label}>Titre *</label>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={resetBookModal}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-gold/15 bg-[#1c1410] p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-xl font-semibold text-parchment">
+                {editingBook ? 'Modifier le livre' : 'Nouveau livre'}
+              </h2>
+              <button onClick={resetBookModal} className="text-muted hover:text-parchment">
+                <X size={20} />
+              </button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleSaveBook()
+              }}
+              className="mt-5 flex flex-col gap-3"
+            >
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Titre *</label>
               <input
                 type="text"
                 value={bookForm.title}
                 onChange={(e) => setBookForm({ ...bookForm, title: e.target.value })}
-                style={styles.input}
+                className="field"
                 required
               />
 
-              <label style={styles.label}>Auteur</label>
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Auteur</label>
               <input
                 type="text"
                 value={bookForm.author}
                 onChange={(e) => setBookForm({ ...bookForm, author: e.target.value })}
-                style={styles.input}
+                className="field"
               />
 
-              <label style={styles.label}>Description</label>
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Description</label>
               <textarea
                 value={bookForm.description}
                 onChange={(e) => setBookForm({ ...bookForm, description: e.target.value })}
-                style={styles.textarea}
+                className="field"
                 rows={4}
               />
 
-              <label style={styles.label}>Catégorie</label>
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Catégorie</label>
               <select
                 value={bookForm.category_id}
                 onChange={(e) => setBookForm({ ...bookForm, category_id: e.target.value })}
-                style={styles.input}
+                className="field"
               >
                 <option value="">Sélectionnez une catégorie</option>
                 {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
                 ))}
               </select>
 
-              <label style={styles.label}>URL de couverture (Google Drive)</label>
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Couverture</label>
               <input
                 type="text"
                 value={bookForm.cover_url}
-                onChange={(e) => setBookForm({ ...bookForm, cover_url: e.target.value })}
-                style={styles.input}
-                placeholder="https://drive.google.com/file/d/1abc123.../view"
+                onChange={(e) => {
+                  setBookCoverFile(null)
+                  setBookCoverPreview('')
+                  setBookForm({ ...bookForm, cover_url: e.target.value })
+                }}
+                className="field"
+                placeholder="Lien Google Drive https://drive.google.com/file/d/1abc123.../view"
               />
-              <p style={{ fontSize: '0.85rem', color: '#666', margin: '0.25rem 0 0 0' }}>
-                💡 Astuce : Partagez l'image publiquement sur Drive et copiez le lien complet
-              </p>
+              <p className="text-xs text-muted">💡 Astuce : Partagez l'image publiquement sur Drive et copiez le lien complet</p>
+              <label className="mt-1 flex cursor-pointer items-center gap-2 text-sm text-gold">
+                <Upload size={16} />
+                Ou uploader une image
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleBookCoverPick(e.target.files?.[0])}
+                />
+              </label>
+              {(bookCoverPreview || bookForm.cover_url) && (
+                <img
+                  src={bookCoverPreview || getDirectImageUrl(bookForm.cover_url)}
+                  alt="Aperçu"
+                  className="mt-1 h-40 w-full rounded-lg object-cover"
+                />
+              )}
 
-              <label style={styles.label}>Lien Google Drive *</label>
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Lien Google Drive *</label>
               <input
                 type="text"
                 value={bookForm.drive_link}
                 onChange={(e) => setBookForm({ ...bookForm, drive_link: e.target.value })}
-                style={styles.input}
+                className="field"
                 placeholder="https://drive.google.com/file/d/..."
                 required
               />
 
-              <label style={styles.label}>ID fichier Drive (optionnel)</label>
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">ID fichier Drive (optionnel)</label>
               <input
                 type="text"
                 value={bookForm.drive_file_id}
                 onChange={(e) => setBookForm({ ...bookForm, drive_file_id: e.target.value })}
-                style={styles.input}
+                className="field"
                 placeholder="1dkPeFZDNDsU_3-B_..."
               />
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label style={styles.label}>Langue</label>
+                  <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Langue</label>
                   <input
                     type="text"
                     value={bookForm.language}
                     onChange={(e) => setBookForm({ ...bookForm, language: e.target.value })}
-                    style={styles.input}
+                    className="field mt-1"
                     placeholder="Français"
                   />
                 </div>
 
                 <div>
-                  <label style={styles.label}>Taille du fichier</label>
+                  <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Taille du fichier</label>
                   <input
                     type="text"
                     value={bookForm.file_size}
                     onChange={(e) => setBookForm({ ...bookForm, file_size: e.target.value })}
-                    style={styles.input}
+                    className="field mt-1"
                     placeholder="2.5 MB"
                   />
                 </div>
 
                 <div>
-                  <label style={styles.label}>Nombre de pages</label>
+                  <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Nombre de pages</label>
                   <input
                     type="number"
                     value={bookForm.pages}
                     onChange={(e) => setBookForm({ ...bookForm, pages: e.target.value })}
-                    style={styles.input}
+                    className="field mt-1"
                   />
                 </div>
 
                 <div>
-                  <label style={styles.label}>Année de publication</label>
+                  <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Année de publication</label>
                   <input
                     type="number"
                     value={bookForm.published_year}
                     onChange={(e) => setBookForm({ ...bookForm, published_year: e.target.value })}
-                    style={styles.input}
+                    className="field mt-1"
                     placeholder="2024"
                   />
                 </div>
               </div>
 
-              <div style={styles.modalActions}>
-                <button type="button" onClick={() => setShowBookModal(false)} style={styles.cancelButton}>
+              <div className="mt-3 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={resetBookModal}
+                  className="btn-library border border-gold/20 text-muted"
+                >
                   Annuler
                 </button>
-                <button type="submit" style={styles.saveButton}>
-                  Enregistrer
+                <button type="submit" disabled={savingBook} className="btn-library bg-gold text-ink disabled:opacity-60">
+                  {savingBook ? 'Enregistrement…' : 'Enregistrer'}
                 </button>
               </div>
             </form>
@@ -927,409 +984,4 @@ export default function AdminPage() {
       )}
     </div>
   )
-}
-
-const styles = {
-  container: { minHeight: '100vh', background: '#f5f5f5' },
-  header: {
-    background: 'white',
-    padding: '1.5rem 2rem',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-  },
-  logo: { margin: 0, color: '#667eea', fontSize: '1.5rem', fontWeight: 'bold', display: 'flex', alignItems: 'center' },
-  logoutButton: {
-    padding: '0.6rem 1.5rem',
-    background: '#ef4444',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: '600',
-    transition: 'all 0.3s',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  content: { maxWidth: '1400px', margin: '0 auto', padding: '2rem' },
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-    gap: '1.5rem',
-    marginBottom: '2rem',
-  },
-  statCard: {
-    background: 'white',
-    padding: '2rem',
-    borderRadius: '12px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-    color: 'white',
-    textAlign: 'center' as const,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-  },
-  statValue: { fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.25rem' },
-  statLabel: { fontSize: '0.9rem', opacity: 0.9 },
-  tabs: {
-    gap: '1rem',
-    marginBottom: '2rem',
-    background: 'white',
-    padding: '1rem',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-  },
-  tab: {
-    padding: '0.75rem 1.5rem',
-    background: 'transparent',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: '600',
-    color: '#666',
-    transition: 'all 0.3s',
-    fontSize: '1rem',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  activeTab: {
-    background: '#667eea',
-    color: 'white',
-  },
-  tabContent: {
-    background: 'white',
-    padding: '2rem',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    minHeight: '400px',
-  },
-  loading: {
-    textAlign: 'center' as const,
-    padding: '3rem',
-    fontSize: '1.2rem',
-    color: '#667eea',
-  },
-  sectionTitle: {
-    fontSize: '1.5rem',
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: '1.5rem',
-  },
-  sectionHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '2rem',
-  },
-  addButton: {
-    padding: '0.75rem 1.5rem',
-    background: '#667eea',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: '600',
-    fontSize: '1rem',
-    transition: 'all 0.3s',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  emptyMessage: {
-    textAlign: 'center' as const,
-    padding: '3rem',
-    color: '#999',
-    fontSize: '1.1rem',
-  },
-  tableContainer: {
-    overflowX: 'auto' as const,
-    marginBottom: '2rem',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse' as const,
-    fontSize: '0.95rem',
-  },
-  th: {
-    textAlign: 'left' as const,
-    padding: '1rem',
-    background: '#f8f9fa',
-    fontWeight: 'bold',
-    color: '#333',
-    borderBottom: '2px solid #e0e0e0',
-  },
-  tr: {
-    borderBottom: '1px solid #f0f0f0',
-  },
-  td: {
-    padding: '1rem',
-    color: '#555',
-  },
-  methodBadge: {
-    display: 'inline-block',
-    padding: '0.25rem 0.75rem',
-    background: '#e0e7ff',
-    color: '#4338ca',
-    borderRadius: '20px',
-    fontSize: '0.85rem',
-    fontWeight: '600',
-  },
-  statusBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '0.25rem 0.75rem',
-    borderRadius: '20px',
-    fontSize: '0.85rem',
-    fontWeight: '600',
-  },
-  statusCompleted: {
-    background: '#d1fae5',
-    color: '#065f46',
-  },
-  statusPending: {
-    background: '#fef3c7',
-    color: '#92400e',
-  },
-  statusFailed: {
-    background: '#fee2e2',
-    color: '#991b1b',
-  },
-  usersGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: '1.5rem',
-  },
-  userCard: {
-    display: 'flex',
-    gap: '1rem',
-    padding: '1.5rem',
-    background: '#f8f9fa',
-    borderRadius: '12px',
-    border: '1px solid #e0e0e0',
-  },
-  userAvatar: {
-    width: '60px',
-    height: '60px',
-    borderRadius: '50%',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '1.5rem',
-    fontWeight: 'bold',
-    flexShrink: 0,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    margin: '0 0 0.5rem 0',
-    fontSize: '1.1rem',
-    color: '#333',
-  },
-  userEmail: {
-    margin: '0.25rem 0',
-    fontSize: '0.9rem',
-    color: '#666',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  userPhone: {
-    margin: '0.25rem 0',
-    fontSize: '0.9rem',
-    color: '#666',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  userCity: {
-  margin: '0.25rem 0',
-  fontSize: '0.9rem',
-  color: '#666',
-  display: 'flex',
-  alignItems: 'center',
-},
-  userDate: {
-    margin: '0.5rem 0 0 0',
-    fontSize: '0.85rem',
-    color: '#999',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: '1.5rem',
-  },
-  categoryCard: {
-    background: '#f8f9fa',
-    padding: '1.5rem',
-    borderRadius: '12px',
-    textAlign: 'center' as const,
-    border: '1px solid #e0e0e0',
-  },
-  categoryIcon: {
-    width: '80px',
-    height: '80px',
-    margin: '0 auto 1rem',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '2rem',
-  },
-  categoryName: {
-    margin: '0 0 0.5rem 0',
-    fontSize: '1.2rem',
-    color: '#333',
-  },
-  categoryDesc: {
-    margin: '0 0 1rem 0',
-    fontSize: '0.9rem',
-    color: '#666',
-    minHeight: '40px',
-  },
-  cardActions: {
-    display: 'flex',
-    gap: '0.5rem',
-    justifyContent: 'center',
-  },
-  editButton: {
-    padding: '0.5rem 1rem',
-    background: '#3b82f6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '0.9rem',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  deleteButton: {
-    padding: '0.5rem 1rem',
-    background: '#ef4444',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '0.9rem',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  bookCard: {
-    background: '#f8f9fa',
-    borderRadius: '12px',
-    overflow: 'hidden',
-    border: '1px solid #e0e0e0',
-  },
-  bookCover: {
-    width: '100%',
-    height: '200px',
-    objectFit: 'cover' as const,
-    backgroundColor: '#f0f0f0',
-  },
-  bookInfo: {
-    padding: '1rem',
-  },
-  bookTitle: {
-    margin: '0 0 0.5rem 0',
-    fontSize: '1.1rem',
-    color: '#333',
-  },
-  bookAuthor: {
-    margin: '0 0 0.75rem 0',
-    fontSize: '0.9rem',
-    color: '#666',
-  },
-  bookStats: {
-    display: 'flex',
-    gap: '1rem',
-    marginBottom: '1rem',
-    fontSize: '0.85rem',
-    color: '#999',
-  },
-  modal: {
-    position: 'fixed' as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    padding: '1rem',
-  },
-  modalContent: {
-    background: 'white',
-    borderRadius: '12px',
-    padding: '2rem',
-    maxWidth: '600px',
-    width: '100%',
-    maxHeight: '90vh',
-    overflowY: 'auto' as const,
-  },
-  modalTitle: {
-    margin: '0 0 1.5rem 0',
-    fontSize: '1.5rem',
-    color: '#333',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '1rem',
-  },
-  label: {
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: '0.25rem',
-  },
-  input: {
-    padding: '0.75rem',
-    border: '1px solid #e0e0e0',
-    borderRadius: '8px',
-    fontSize: '1rem',
-    width: '100%',
-  },
-  textarea: {
-    padding: '0.75rem',
-    border: '1px solid #e0e0e0',
-    borderRadius: '8px',
-    fontSize: '1rem',
-    width: '100%',
-    fontFamily: 'inherit',
-    resize: 'vertical' as const,
-  },
-  colorInput: {
-    padding: '0.5rem',
-    border: '1px solid #e0e0e0',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    height: '50px',
-  },
-  modalActions: {
-    display: 'flex',
-    gap: '1rem',
-    justifyContent: 'flex-end',
-    marginTop: '1rem',
-  },
-  cancelButton: {
-    padding: '0.75rem 1.5rem',
-    background: '#e0e0e0',
-    color: '#333',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: '600',
-  },
-  saveButton: {
-    padding: '0.75rem 1.5rem',
-    background: '#667eea',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: '600',
-  },
 }
