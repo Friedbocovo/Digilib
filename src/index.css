@@ -339,6 +339,48 @@ select.field option { background: #1b1713; color: #f6f0e6; }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+.card-scan-frame {
+  aspect-ratio: 1.586 / 1;
+  box-shadow: 0 0 0 1px rgba(212, 165, 116, 0.15), 0 30px 60px rgba(0, 0, 0, 0.6);
+  animation: card-scan-frame-pulse 1.8s ease-in-out infinite;
+}
+.card-scan-frame img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+@keyframes card-scan-frame-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(212, 165, 116, 0.15), 0 30px 60px rgba(0, 0, 0, 0.6); }
+  50% { box-shadow: 0 0 0 1px rgba(212, 165, 116, 0.45), 0 30px 70px rgba(0, 0, 0, 0.6); }
+}
+
+.card-scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #efc792, transparent);
+  box-shadow: 0 0 16px 3px rgba(239, 199, 146, 0.85);
+  animation: card-scan-move 1.8s ease-in-out infinite;
+}
+@keyframes card-scan-move {
+  0% { top: 2%; }
+  50% { top: 96%; }
+  100% { top: 2%; }
+}
+
+.card-scan-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-color: #efc792;
+}
+.card-scan-corner-tl { top: 8px; left: 8px; border-top: 3px solid; border-left: 3px solid; }
+.card-scan-corner-tr { top: 8px; right: 8px; border-top: 3px solid; border-right: 3px solid; }
+.card-scan-corner-bl { bottom: 8px; left: 8px; border-bottom: 3px solid; border-left: 3px solid; }
+.card-scan-corner-br { bottom: 8px; right: 8px; border-bottom: 3px solid; border-right: 3px solid; }
+
 .splash-title {
   margin-top: 1.5rem;
   font-size: clamp(4.5rem, 16vw, 11rem);
@@ -394,7 +436,7 @@ select.field option { background: #1b1713; color: #f6f0e6; }
 
 @media (prefers-reduced-motion: reduce) {
   .kenburns, .dust span, .shelf-rise .spine, .hero-copy > *, .book-float, .page-enter,
-  .splash-letter, .splash-loading-bar, .splash-logo {
+  .splash-letter, .splash-loading-bar, .splash-logo, .card-scan-line, .card-scan-frame {
     animation: none !important;
   }
   .reveal, .shelf-rise .spine { opacity: 1; transform: none; }

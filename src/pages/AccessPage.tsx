@@ -19,6 +19,7 @@ export default function AccessPage() {
   const [popup, setPopup] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   const [mode, setMode] = useState<'form' | 'card'>('form')
   const [cardLoading, setCardLoading] = useState(false)
+  const [cardPreviewUrl, setCardPreviewUrl] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -200,9 +201,12 @@ export default function AccessPage() {
   }
 
   const handleCardFile = async (file: File) => {
+    const imageUrl = URL.createObjectURL(file)
+    setCardPreviewUrl(imageUrl)
     setCardLoading(true)
+    const scanStart = Date.now()
+    const MIN_SCAN_TIME = 1600
     try {
-      const imageUrl = URL.createObjectURL(file)
       const image = new Image()
       const imageData: ImageData = await new Promise((resolve, reject) => {
         image.onload = () => {
@@ -220,7 +224,6 @@ export default function AccessPage() {
         image.onerror = () => reject(new Error('image'))
         image.src = imageUrl
       })
-      URL.revokeObjectURL(imageUrl)
 
       const code = jsQR(imageData.data, imageData.width, imageData.height)
       const payload = code ? decodeCardPayload(code.data) : null
@@ -253,13 +256,35 @@ export default function AccessPage() {
     } catch {
       setPopup({ message: 'Impossible de lire cette carte. Essayez le formulaire.', type: 'error' })
     } finally {
+      const elapsed = Date.now() - scanStart
+      if (elapsed < MIN_SCAN_TIME) await new Promise((r) => setTimeout(r, MIN_SCAN_TIME - elapsed))
       setCardLoading(false)
+      URL.revokeObjectURL(imageUrl)
+      setCardPreviewUrl('')
     }
   }
 
   return (
     <>
       {popup && <Popup {...popup} onClose={() => setPopup(null)} />}
+
+      {cardLoading && (
+        <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-black/85 p-4">
+          <div className="card-scan-frame relative w-full max-w-[260px] overflow-hidden rounded-xl border border-gold/30 bg-[#1c1410]">
+            {cardPreviewUrl && <img src={cardPreviewUrl} alt="" className="block w-full" />}
+            <div className="card-scan-line" />
+            <span className="card-scan-corner card-scan-corner-tl" />
+            <span className="card-scan-corner card-scan-corner-tr" />
+            <span className="card-scan-corner card-scan-corner-bl" />
+            <span className="card-scan-corner card-scan-corner-br" />
+          </div>
+          <p className="mt-6 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-gold">
+            <QrCode size={14} className="animate-pulse" />
+            Analyse de la carte…
+          </p>
+        </div>
+      )}
+
       <AuthCardLayout name={name} city={city} email={email} phone={phone}>
           <p className="text-[11px] uppercase tracking-[0.22em] text-gold">Bureau des inscriptions</p>
           <h1 className="mt-2 font-display text-4xl font-semibold text-parchment">Carte d’entrée</h1>

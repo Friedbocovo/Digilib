@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { ChevronDown, Download } from 'lucide-react'
 import AislePhoto from './bg2.jpg'
 import { PublicLayout } from '../components/public/PublicLayout'
@@ -18,7 +18,13 @@ const dust = [
 ]
 
 export default function HomePage() {
+  const navigate = useNavigate()
   const [openFAQ, setOpenFAQ] = useState<number | null>(0)
+
+  useEffect(() => {
+    const accessToken = localStorage.getItem('library_access_token')
+    if (accessToken) navigate('/library', { replace: true })
+  }, [navigate])
 
   return (
     <PublicLayout>

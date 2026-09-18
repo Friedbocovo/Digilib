@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { Popup } from '../components/Popup'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { CoverImage } from '../components/CoverImage'
-import { LibraryChrome, ROMANS } from '../components/library/LibraryChrome'
+import { LibraryChrome, toRoman } from '../components/library/LibraryChrome'
 import { EntryCard } from '../components/EntryCard'
 import { getDirectDownloadLink } from '../lib/drive'
 import { ArrowLeft, Search, Download, Eye } from 'lucide-react'
@@ -273,7 +273,7 @@ export default function LibraryPage() {
                     </div>
                     <div className="catalog-card-body">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="font-display text-xl italic text-[#8b5a2b]">{ROMANS[i] || i + 1}</p>
+                        <p className="font-display text-xl italic text-[#8b5a2b]">{toRoman(i + 1)}</p>
                         <p className="text-[10px] uppercase tracking-[0.16em] text-[#8b5a2b]">
                           {count} {count > 1 ? 'titres' : 'titre'}
                         </p>

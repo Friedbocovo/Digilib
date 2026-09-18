@@ -139,8 +139,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (activeTab === 'categories') loadCategories()
-    else if (activeTab === 'books') loadBooks()
-    else if (activeTab === 'payments') loadPayments()
+    else if (activeTab === 'books') {
+      loadBooks()
+      loadCategories()
+    } else if (activeTab === 'payments') loadPayments()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
@@ -638,64 +640,96 @@ export default function AdminPage() {
                     </button>
                   </div>
 
-                  <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                    {books.map((book) => (
-                      <div key={book.id} className="overflow-hidden rounded-xl border border-gold/10 bg-[#150f0c]">
-                        <img
-                          src={getDirectImageUrl(book.cover_url)}
-                          alt={book.title}
-                          className="h-48 w-full bg-[#1c1410] object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = 'https://placehold.co/300x400/1b1713/e8d8be?text=Livre'
-                          }}
-                        />
-                        <div className="p-4">
-                          <h3 className="truncate font-display text-base text-parchment">{book.title}</h3>
-                          {book.author && <p className="mt-1 truncate text-sm text-muted">{book.author}</p>}
-                          <div className="mt-3 flex gap-4 text-xs text-muted">
-                            <span className="flex items-center gap-1">
-                              <Eye size={13} /> {book.views}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Download size={13} /> {book.downloads}
-                            </span>
+                  {books.length === 0 ? (
+                    <p className="py-12 text-center text-muted">Aucun livre pour le moment</p>
+                  ) : (
+                    <div className="mt-6 flex flex-col gap-10">
+                      {[
+                        ...categories.map((category) => ({
+                          key: category.id,
+                          label: category.name,
+                          icon: category.icon,
+                          items: books.filter((b) => b.category_id === category.id),
+                        })),
+                        {
+                          key: 'uncategorized',
+                          label: 'Sans catégorie',
+                          icon: '📂',
+                          items: books.filter((b) => !categories.some((c) => c.id === b.category_id)),
+                        },
+                      ]
+                        .filter((group) => group.items.length > 0)
+                        .map((group) => (
+                          <div key={group.key}>
+                            <div className="mb-4 flex items-center gap-2">
+                              <span className="text-lg">{group.icon}</span>
+                              <h3 className="font-display text-lg text-parchment">{group.label}</h3>
+                              <span className="text-xs text-muted">
+                                ({group.items.length} {group.items.length > 1 ? 'livres' : 'livre'})
+                              </span>
+                            </div>
+                            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                              {group.items.map((book) => (
+                                <div key={book.id} className="overflow-hidden rounded-xl border border-gold/10 bg-[#150f0c]">
+                                  <img
+                                    src={getDirectImageUrl(book.cover_url)}
+                                    alt={book.title}
+                                    className="h-48 w-full bg-[#1c1410] object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.src = 'https://placehold.co/300x400/1b1713/e8d8be?text=Livre'
+                                    }}
+                                  />
+                                  <div className="p-4">
+                                    <h3 className="truncate font-display text-base text-parchment">{book.title}</h3>
+                                    {book.author && <p className="mt-1 truncate text-sm text-muted">{book.author}</p>}
+                                    <div className="mt-3 flex gap-4 text-xs text-muted">
+                                      <span className="flex items-center gap-1">
+                                        <Eye size={13} /> {book.views}
+                                      </span>
+                                      <span className="flex items-center gap-1">
+                                        <Download size={13} /> {book.downloads}
+                                      </span>
+                                    </div>
+                                    <div className="mt-4 flex gap-2">
+                                      <button
+                                        onClick={() => {
+                                          setEditingBook(book)
+                                          setBookForm({
+                                            title: book.title,
+                                            author: book.author || '',
+                                            description: book.description,
+                                            cover_url: book.cover_url,
+                                            drive_link: book.drive_link,
+                                            drive_file_id: book.drive_file_id || '',
+                                            category_id: book.category_id || '',
+                                            file_size: book.file_size || '',
+                                            pages: book.pages?.toString() || '',
+                                            language: book.language || '',
+                                            published_year: book.published_year?.toString() || '',
+                                          })
+                                          setBookCoverFile(null)
+                                          setBookCoverPreview('')
+                                          setShowBookModal(true)
+                                        }}
+                                        className="btn-library flex-1 border border-gold/30 text-parchment"
+                                      >
+                                        <Edit2 size={14} />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteBook(book.id)}
+                                        className="btn-library flex-1 border border-[#e86b6b]/40 text-[#e86b6b]"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                          <div className="mt-4 flex gap-2">
-                            <button
-                              onClick={() => {
-                                setEditingBook(book)
-                                setBookForm({
-                                  title: book.title,
-                                  author: book.author || '',
-                                  description: book.description,
-                                  cover_url: book.cover_url,
-                                  drive_link: book.drive_link,
-                                  drive_file_id: book.drive_file_id || '',
-                                  category_id: book.category_id || '',
-                                  file_size: book.file_size || '',
-                                  pages: book.pages?.toString() || '',
-                                  language: book.language || '',
-                                  published_year: book.published_year?.toString() || '',
-                                })
-                                setBookCoverFile(null)
-                                setBookCoverPreview('')
-                                setShowBookModal(true)
-                              }}
-                              className="btn-library flex-1 border border-gold/30 text-parchment"
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteBook(book.id)}
-                              className="btn-library flex-1 border border-[#e86b6b]/40 text-[#e86b6b]"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                        ))}
+                    </div>
+                  )}
                 </div>
               )}
             </>
