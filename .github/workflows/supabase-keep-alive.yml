@@ -2,7 +2,7 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    - cron: '0 6 */3 * *'
+    - cron: '0 6 * * *'
   workflow_dispatch: {}
 
 jobs:
@@ -11,7 +11,8 @@ jobs:
     steps:
       - name: Ping Supabase REST API
         run: |
-          curl -sf "${SUPABASE_URL}/rest/v1/categories?select=id&limit=1" \
+          curl -sS --fail --retry 5 --retry-delay 30 --retry-all-errors --max-time 30 \
+            "${SUPABASE_URL}/rest/v1/categories?select=id&limit=1" \
             -H "apikey: ${SUPABASE_ANON_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
             -o /dev/null -w "Status: %{http_code}\n"
