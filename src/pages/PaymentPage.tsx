@@ -13,13 +13,13 @@ import {
   MapPin
 } from 'lucide-react'
 import { AuthCardLayout } from '../components/AuthCardLayout'
+import { LIBRARY_PRICE } from '../data/publicContent'
 
 // ⚠️ MODE SIMULATION 
 const SIMULATION_MODE = false
 
 const MAKETOU_API_KEY = import.meta.env.VITE_MAKETOU_API_KEY || ''
 const MAKETOU_PRODUCT_ID = import.meta.env.VITE_MAKETOU_PRODUCT_ID || ''
-const LIBRARY_ACCESS_PRICE = 2000
 
 export default function PaymentPage() {
   const navigate = useNavigate()
@@ -270,7 +270,7 @@ export default function PaymentPage() {
         user_id: userId,
         user_email: cleanEmail,
         phone_number: cleanPhone,
-        amount: LIBRARY_ACCESS_PRICE,
+        amount: LIBRARY_PRICE,
         transaction_id: transactionId,
         payment_method: SIMULATION_MODE ? 'simulation' : 'maketou',
         status: 'completed',
@@ -406,7 +406,7 @@ export default function PaymentPage() {
           <div className="mt-6 flex flex-col gap-4">
             <div className="rounded-2xl border border-gold/30 bg-gold/10 p-6 text-center">
               <p className="text-sm text-muted">Prix unique</p>
-              <p className="font-display text-5xl font-semibold text-gold">{LIBRARY_ACCESS_PRICE} XOF</p>
+              <p className="font-display text-5xl font-semibold text-gold">{LIBRARY_PRICE} XOF</p>
               <p className="mt-1 text-sm text-muted">Accès illimité à vie</p>
             </div>
 

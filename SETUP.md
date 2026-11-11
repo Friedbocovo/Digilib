@@ -71,7 +71,7 @@ Consultez [FLUTTERWAVE_SETUP.md](./FLUTTERWAVE_SETUP.md) pour la configuration d
 1. **Accueil** : Les utilisateurs arrivent sur la page d'accueil
 2. **Paiement** : Ils cliquent sur "Accéder à la Bibliothèque"
 3. **Email** : Ils entrent leur adresse email
-4. **Paiement** : Ils paient 2000 XAF via Flutterwave
+4. **Paiement** : Ils paient 5000 XAF via Flutterwave
 5. **Bibliothèque** : Accès immédiat à tous les livres
 6. **Lecture/Téléchargement** : Ils peuvent lire et télécharger via Google Drive
 

@@ -45,7 +45,7 @@ L'application sera disponible à `http://localhost:5173`
 ### Utilisateurs
 1. Cliquez "Accéder à la Bibliothèque"
 2. Entrez votre email
-3. Payez 2000 XAF
+3. Payez 5000 XAF
 4. Accédez à la bibliothèque
 5. Lisez/téléchargez via Google Drive
 

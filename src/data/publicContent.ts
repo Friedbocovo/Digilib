@@ -14,7 +14,7 @@ export const WHATSAPP_URL =
   "https://wa.me/22941822980?text=Bonjour%2C%20j'aimerais%20avoir%20acc%C3%A8s%20%C3%A0%20la%20biblioth%C3%A8que%20DigiLib"
 
 export const CONTACT_EMAIL = 'flybrary4@gmail.com'
-export const LIBRARY_PRICE = 2000
+export const LIBRARY_PRICE = 5000
 
 export const freeBooks: FreeBook[] = [
   {
@@ -57,7 +57,7 @@ export const faqs: FAQItem[] = [
   {
     question: 'Comment ça marche ?',
     answer:
-      "Payez une seule fois 2000 XOF via Mobile Money, et accédez à vie à toute la bibliothèque. Lecture en ligne et téléchargement des fichiers.",
+      `Payez une seule fois ${LIBRARY_PRICE} XOF via Mobile Money, et accédez à vie à toute la bibliothèque. Lecture en ligne et téléchargement des fichiers.`,
   },
   {
     question: 'Quels modes de paiement ?',
